@@ -102,7 +102,7 @@ MPV/
 
 ## 📋 Changelog
 
-### 2026-03-17 — Echostorm Audit & Modernz 0.3.0 Update
+### 2026-03-17 — Audit & Modernz 0.3.0 Update
 
 **mpv.conf:**
 - Added `load-select-ui=yes` — enables built-in interactive select menus
