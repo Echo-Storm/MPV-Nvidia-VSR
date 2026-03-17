@@ -20,7 +20,7 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
    - Installs the latest versions of MPV, FFmpeg, and yt-dlp
    - Fully portable, no admin required
 
-2. **Run `3_Add_Supported_Filetypes_To_Open_With.ps1`** *(optional)*
+2. **Run `2_Add_Supported_Filetypes_To_Open_With.ps1`** *(optional)*
    - Adds MPV to system PATH
    - Registers MPV for "Open With" with common media formats
    - Requires admin, will auto-detect and prompt
