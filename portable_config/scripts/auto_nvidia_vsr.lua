@@ -3,8 +3,9 @@
 -- the display resolution and the pixel format is hardware-decoded.
 -- 3-second delay is intentional: gives hwdec time to settle after file load.
 
-local pending_timer = nil
-local applying = false  -- guard against re-entrant trigger from vf changes
+local pending_timer  = nil
+local applying       = false  -- guard against re-entrant trigger from vf changes
+local vsr_was_applied = false  -- tracks whether VSR is currently in the chain
 
 local function apply_vsr()
     applying = true
@@ -22,14 +23,23 @@ local function apply_vsr()
         mp.command("vf remove @vsr")
     end
 
+    vsr_was_applied = false  -- reset; will be set true below if we apply
+
     if video_width and display_width then
         local scale = math.max(display_width, display_height)
                     / math.max(video_width, video_height)
         scale = math.floor(scale * 10) / 10  -- round down to nearest 0.1
 
-        if scale > 1 and (pixfmt == "nv12" or pixfmt == "yuv420p") then
-            mp.command("vf append @vsr:d3d11vpp:scaling-mode=nvidia:scale=" .. scale)
-            mp.osd_message("NVIDIA VSR: " .. scale .. "x upscale", 2)
+        if scale > 1 then
+            if pixfmt == "nv12" or pixfmt == "yuv420p" then
+                mp.command("vf append @vsr:d3d11vpp:scaling-mode=nvidia:scale=" .. scale)
+                mp.osd_message("NVIDIA VSR: " .. scale .. "x upscale", 2)
+                vsr_was_applied = true
+            else
+                -- p010/p016 (10-bit HW decode) and other formats land here.
+                -- NVIDIA VSR support for 10-bit is inconsistent; skipping to avoid errors.
+                mp.msg.info("VSR skipped: unsupported pixel format " .. tostring(pixfmt))
+            end
         end
     end
 
@@ -53,16 +63,16 @@ local function schedule_vsr()
 end
 
 -- Trigger on format change (file load, track switch)
-mp.observe_property("video-params/pixelformat", "native", schedule_vsr)
+mp.observe_property("video-params/pixelformat",    "native", schedule_vsr)
 mp.observe_property("video-params/hw-pixelformat", "native", schedule_vsr)
 
 -- Re-apply if vf chain is externally cleared (e.g. user runs 'vf clr')
--- but NOT when we're the ones changing it
+-- but NOT when we're the ones changing it, and NOT on videos where VSR
+-- was never applied (avoids spurious reschedules on deband toggle etc.)
 mp.observe_property("vf", "native", function()
     if applying then return end
-    -- Only reschedule if VSR was present and now isn't (someone cleared it)
     local vf_current = mp.get_property("vf") or ""
-    if not vf_current:find("@vsr") then
+    if vsr_was_applied and not vf_current:find("@vsr") then
         schedule_vsr()
     end
 end)

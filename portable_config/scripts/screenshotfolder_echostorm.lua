@@ -1,27 +1,35 @@
--- scripts/screenshotfolder.lua
+-- scripts/screenshotfolder_echostorm.lua
 -- Cleaned version: no more 1 Hz spam
 
 local options = {
-    screenshot_key           = 's',
-    file_ext                 = "jpg",
-    save_location            = "~~desktop/mpv/screenshots/",
-    time_stamp_format        = "%tY-%tm-%td_%tH-%tM-%tS",
-    save_as_time_stamp       = true,
+    screenshot_key             = 's',
+    file_ext                   = "jpg",
+    save_location              = "~~desktop/mpv/screenshots/",
+    time_stamp_format          = "%tY-%tm-%td_%tH-%tM-%tS",
+    save_as_time_stamp         = true,
     save_based_on_chapter_name = false,
-    short_saved_message      = true,
-    include_YouTube_ID       = true
+    short_saved_message        = true,
+    include_YouTube_ID         = true
 }
 require "mp.options".read_options(options)
 
-local title            = "default"
-local chaptername      = ""
-local count            = 0
-local current_format   = options.file_ext
+local title       = "default"
+local chaptername = ""
+local count       = 0
+local current_format = options.file_ext
 
--- Builds & applies directory + template + format
+-- Strip characters that are illegal in Windows path/file names.
+-- Also strips leading/trailing spaces and dots, which Windows silently
+-- mangles or rejects in directory and file names.
+local function safe(name)
+    return name
+        :gsub('[\\/:*?"<>|]', '')
+        :gsub('^[%s.]+', '')
+        :gsub('[%s.]+$', '')
+end
+
+-- Builds and applies directory + template + format to mpv properties
 local function set_screenshot_template()
-    local function safe(name) return name:gsub('[\\/:*?"<>|]', '') end
-
     mp.set_property("screenshot-format", current_format)
 
     local subdir = options.save_location .. safe(title) .. "/"
@@ -39,11 +47,10 @@ local function set_screenshot_template()
     end
 end
 
--- Called on file load or when chapter metadata changes
+-- Called on file load. Uses file-loaded (not start-file) so that media-title,
+-- path, and filename are guaranteed to be populated before we read them.
 local function init()
-    -- Determine title (with YouTube ID if URL)
-    local path = mp.get_property("path") or ""
-    local name = mp.get_property("filename/no-ext") or ""
+    local name  = mp.get_property("filename/no-ext") or ""
     local media = mp.get_property("media-title") or name
 
     if media:match("^[%w]+://") and options.include_YouTube_ID then
@@ -71,14 +78,15 @@ local function screenshot_done()
     end
 end
 
--- Update on chapter changes (optional)
+-- Update template when chapter changes
 mp.observe_property("chapter-metadata/title", "string", function(_, v)
     chaptername = v or ""
     set_screenshot_template()
 end)
 
--- Only run on file load/start-file
-mp.register_event("start-file", init)
+-- file-loaded is the correct event: fires after the file is fully parsed
+-- and all properties (media-title, path, filename) are available.
+-- start-file fires too early and was previously registered here in error.
 mp.register_event("file-loaded", init)
 
 -- Bind screenshot key
