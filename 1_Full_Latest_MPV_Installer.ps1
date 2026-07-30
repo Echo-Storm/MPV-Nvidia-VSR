@@ -145,6 +145,12 @@ function Get-Latest-YtDlp-Version {
     $xml.feed.entry[0].link.href.Split("/")[-1]
 }
 
+function Get-Latest-Guessit-Version {
+    Write-Host "Fetching guessit latest version..." -ForegroundColor Green
+    $xml = [xml](Invoke-WebRequest "https://github.com/guessit-io/guessit/releases.atom" -UseBasicParsing).Content
+    $xml.feed.entry[0].link.href.Split("/")[-1]
+}
+
 # -----------------------------
 # Updaters
 # -----------------------------
@@ -206,6 +212,27 @@ function Upgrade-YtDlp {
     Write-Host "✔ yt-dlp updated to $ver" -ForegroundColor Green
 }
 
+function Upgrade-Guessit {
+    # Required by portable_config/scripts/autochapters (mpv-auto-chapters).
+    # Dropped in $installDir alongside mpv.exe/yt-dlp.exe so mpv's bare
+    # "guessit" subprocess call finds it without any PATH registration --
+    # Windows searches the calling exe's own directory before PATH.
+    $ver = Get-Latest-Guessit-Version
+    $marker = Join-Path $installDir ".guessit_last_version.txt"
+
+    if (Test-Path $marker) {
+        $last = Get-Content $marker -ErrorAction Ignore | Select-Object -First 1
+        if ($last -eq $ver) {
+            Write-Host "guessit is already up to date ($ver)." -ForegroundColor Green
+            return
+        }
+    }
+
+    Download-File "https://github.com/guessit-io/guessit/releases/download/$ver/guessit-windows.exe" "guessit.exe" | Out-Null
+    Set-Content $marker $ver -Encoding ASCII
+    Write-Host "✔ guessit updated to $ver" -ForegroundColor Green
+}
+
 # -----------------------------
 # Main Execution
 # -----------------------------
@@ -215,6 +242,7 @@ try {
 
     Upgrade-Mpv
     Upgrade-YtDlp
+    Upgrade-Guessit
     Upgrade-FFmpeg
 
     Cleanup-7z

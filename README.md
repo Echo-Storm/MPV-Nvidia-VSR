@@ -17,7 +17,7 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
 ### ✅ To install:
 
 1. **Run `1_Full_Latest_MPV_Installer.ps1`**
-   - Installs the latest versions of MPV, FFmpeg, and yt-dlp
+   - Installs the latest versions of MPV, FFmpeg, yt-dlp, and guessit (used by `autochapters`)
    - Fully portable, no admin required
 
 2. **Run `2_Add_Supported_Filetypes_To_Open_With.ps1`** *(optional)*
@@ -33,7 +33,7 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
 ### 🔁 To update:
 
 - Simply run `1_Full_Latest_MPV_Installer.ps1`
-- Updates MPV, FFmpeg, and yt-dlp
+- Updates MPV, FFmpeg, yt-dlp, and guessit
 - No need to re-run registration scripts unless you've uninstalled
 
 ---
@@ -62,15 +62,25 @@ MPV/
     │   ├── thumbfast.lua                 ← seekbar thumbnails
     │   ├── pause_indicator_lite.lua      ← pause overlay
     │   ├── playlistmanager.lua           ← playlist OSD
-    │   ├── open_file.lua                 ← native Windows open file/subtitle/audio dialog
-    │   └── ytdlautoformat.lua            ← auto ytdl-format per domain (YouTube, Twitch, Kick)
+    │   ├── open_file.lua                 ← native Windows open file/folder/subtitle/audio dialog (Echostorm: added open folder)
+    │   ├── ytdlautoformat.lua            ← auto ytdl-format per domain (YouTube, Twitch, Kick)
+    │   ├── autocrop.lua                  ← auto-crop black bars (mpv core script)
+    │   ├── chapterskip.lua               ← auto-skip OP/ED/preview chapters
+    │   ├── reload.lua                    ← auto-reload stalled streams
+    │   ├── hdr-mode.lua                  ← SDR/HDR auto-switch (inert until mpv-display-plugin is installed)
+    │   └── autochapters/main.lua         ← auto-detect anime OP/ED chapters (needs guessit.exe, see below)
     ├── script-opts/
     │   ├── modernz.conf
     │   ├── thumbfast.conf
     │   ├── pause_indicator_lite.conf
     │   ├── playlistmanager.conf
     │   ├── ytdlautoformat.conf
-    │   └── ytdl_hook.conf                ← pins ytdl_path to yt-dlp
+    │   ├── ytdl_hook.conf                ← pins ytdl_path to yt-dlp
+    │   ├── autocrop.conf
+    │   ├── chapterskip.conf
+    │   ├── reload.conf
+    │   ├── hdr-mode.conf
+    │   └── autochapters.conf
     └── shaders/
         └── cache/
 ```
@@ -88,9 +98,14 @@ MPV/
 - **Audio normalization:** `dynaudnorm` available via `af=` in `mpv.conf` (commented out by default — uncomment to enable)
 - **Network buffering:** Cache and readahead configured for HLS/live stream stability
 - **UI:** Borders enabled, windowed by default, taskbar progress enabled
-- **File dialogs:** `Ctrl+O` opens files, `Ctrl+Shift+S` adds a subtitle, `Ctrl+Shift+A` adds an audio track — all via the native Windows file picker, also reachable from the right-click menu
-- **Right-click menu:** mpv's full default context menu (`menu.conf`) — playback, tracks, video/audio/subtitle controls, window, tools, etc. — plus Open File/Subtitle/Audio at the top of the Open submenu
+- **File dialogs:** `Ctrl+O` opens files, `Ctrl+Shift+O` opens a folder, `Ctrl+Shift+S` adds a subtitle, `Ctrl+Shift+A` adds an audio track — all via native Windows dialogs, also reachable from the right-click menu
+- **Right-click menu:** mpv's full default context menu (`menu.conf`) — playback, tracks, video/audio/subtitle controls, window, tools, etc. — plus Open File/Folder/Subtitle/Audio at the top of the Open submenu
 - **Stream quality:** `ytdl-format` auto-adjusts for YouTube, Twitch, and Kick (720p cap by default), leaving other sites on `mpv.conf`'s default — pairs well with RTX VSR upscaling lower-res source
+- **Auto-crop:** black bars auto-detected and cropped 4 seconds into playback (`c` to toggle/undo manually — `C`, uppercase, is taken by the aspect-ratio cycle)
+- **Chapter skip:** opening, ending, and next-episode preview chapters auto-skipped when present
+- **Auto chapters:** missing OP/ED chapters looked up automatically for anime files (requires `guessit.exe`, installed automatically by script 1; and `curl`, built into Windows 10/11)
+- **Stream auto-reload:** a stalled/dead network stream automatically reloads from its last position (`Ctrl+R` to trigger manually)
+- **HDR auto-switch:** wired in but inert by default — needs [mpv-display-plugin](https://github.com/dyphire/mpv-display-plugin) installed separately, then set `hdr_mode=switch` or `pass` in `hdr-mode.conf`
 
 ---
 
@@ -106,7 +121,30 @@ MPV/
 
 ## 📋 Changelog
 
-### 2026-07-29 — v1.0.0: Full Script Sync & Bug Fix
+### 2026-07-29 — v1.0.4: Open Folder, Crop/Chapter/Reload/HDR Scripts
+
+**open_file.lua:**
+- Added `open_folder()` — opens a folder via the `Shell.Application` `BrowseForFolder` COM dialog (WPF has no native folder picker, so this is the classic tree-view Windows dialog rather than the modern Explorer-style one used by the file/subtitle/audio pickers). Bound to `Ctrl+Shift+O` and added to the right-click menu.
+
+**modernz.conf:**
+- `hidetimeout` 1500 → 3000 — OSC now stays visible 3 seconds after the last mouse movement instead of 1.5
+
+**New — autocrop.lua (mpv core, `TOOLS/lua/autocrop.lua`):**
+- Auto-detects and crops black bars ~4 seconds into playback, using the `video-crop` property (not the `vf` chain), so it doesn't collide with `auto_nvidia_vsr.lua`'s `@vsr` filter
+- Default manual toggle key is uppercase `C`, already taken by the aspect-ratio cycle in `input.conf` — remapped to lowercase `c`, also added to the right-click `&Video` menu
+
+**New — chapterskip.lua (po5/chapterskip):**
+- Auto-skips opening/ending/preview chapters when present. `chapterskip.conf` defaults to `skip=opening;ending;preview`
+
+**New — autochapters (po5/mpv-auto-chapters, `scripts/autochapters/main.lua`):**
+- Looks up missing OP/ED chapters for anime files via a local offline anime database + the Aniskip API, pairs with `chapterskip.lua`
+- Requires `curl` (built into Windows 10/11 at `System32\curl.exe`) and `guessit.exe`. Wired in portably: `1_Full_Latest_MPV_Installer.ps1` now downloads the latest `guessit-windows.exe` from guessit-io/guessit into the install root as `guessit.exe`, right next to `mpv.exe`/`yt-dlp.exe` — mpv's subprocess call finds it there automatically (same resolution order as the existing yt-dlp bundling), no PATH registration needed
+
+**New — reload.lua (4e6/mpv-reload):**
+- Auto-reloads a stalled/dead network stream from its last position. Complements the HLS/live-stream buffering tuning already in `mpv.conf`. `Ctrl+R` to trigger manually, also in the right-click Playback menu
+
+**New — hdr-mode.lua (dyphire/mpv-scripts):**
+- Auto-switches display SDR/HDR based on content. Installed but left inert (`hdr_mode=noth`) — `switch`/`pass` modes require the separate [mpv-display-plugin](https://github.com/dyphire/mpv-display-plugin) (a compiled C plugin) for display capability info, which isn't installed
 
 ### 2026-07-29 — v1.0.3: Fix load-select, Add Right-Click Menu
 
@@ -134,6 +172,8 @@ MPV/
 ### 2026-07-29 — v1.0.1: VSR Filter Fix
 
 - See commit history — fixed a stale `@vsr` filter lingering across file switches and a missed re-evaluation when consecutive files share a pixel format but differ in resolution. 3-second hwdec settle delay unchanged.
+
+### 2026-07-29 — v1.0.0: Full Script Sync & Bug Fix
 
 **Bug fix — 1_Full_Latest_MPV_Installer.ps1:**
 - Removed unconditional admin elevation. The script only downloads/extracts into its own portable folder and writes marker files — never needs admin — but was always triggering a UAC prompt anyway, contradicting the README's "no admin required" claim.

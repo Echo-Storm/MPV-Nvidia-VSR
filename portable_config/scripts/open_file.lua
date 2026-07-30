@@ -1,11 +1,16 @@
 --[[
 
-    Open files, add subtitles, or add audio tracks directly from mpv 
-    via the Windows file dialog
+    Open files/folders, add subtitles, or add audio tracks directly from
+    mpv via the Windows file dialog
 
     More info: https://github.com/Samillion/ModernZ/tree/main/extras/open-file
 
     A fork of https://github.com/rossy/mpv-open-file-dialog
+
+    Echostorm Edition: added open_folder(), which uses the Shell.Application
+    BrowseForFolder COM dialog since WPF has no native folder picker. It's
+    a genuine native Windows dialog, just the classic tree-view style
+    rather than the modern Explorer-style picker used by open()/add_*().
 
 --]]
 
@@ -90,6 +95,24 @@ local function add_audio()
     end
 end
 
+local function open_folder()
+    local stdout = invoke_dialog([[
+        $sa = New-Object -ComObject Shell.Application
+        $folder = $sa.BrowseForFolder(0, "Select a folder to open", 0, 0)
+        if ($folder) { $folder.Self.Path }
+    ]])
+
+    if not stdout then return end
+
+    local path = stdout:match("[^\r\n]+")
+    if path then
+        -- mpv expands a directory into a playlist automatically
+        -- (autocreate-playlist, default on)
+        mp.commandv("loadfile", path, "replace")
+    end
+end
+
 mp.add_key_binding(nil, "open", open)
+mp.add_key_binding(nil, "open_folder", open_folder)
 mp.add_key_binding(nil, "add_subtitle", add_subtitle)
 mp.add_key_binding(nil, "add_audio", add_audio)
