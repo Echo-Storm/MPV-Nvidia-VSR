@@ -48,8 +48,12 @@ local parsed = {}
 function chapterskip(_, current)
     mp.options.read_options(options, "chapterskip")
     if not options.enabled then return end
+    -- current can be nil (property momentarily unavailable, e.g. mid-seek
+    -- or on a file with no chapters at all); the arithmetic below assumes
+    -- a number, so bail rather than erroring out of this callback.
+    if current == nil then return end
     for category in string.gmatch(options.categories, "([^;]+)") do
-        name, patterns = string.match(category, " *([^+>]*[^+> ]) *[+>](.*)")
+        local name, patterns = string.match(category, " *([^+>]*[^+> ]) *[+>](.*)")
         if name then
             categories[name:lower()] = patterns
         elseif not parsed[category] then

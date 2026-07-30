@@ -20,3 +20,7 @@ portable_config/shaders/cache/
 *.log
 samplevideo*.mp4
 portable_config.zip
+
+# Claude Code session/worktree metadata -- development-environment
+# specific, not part of the shipped repo
+.claude/

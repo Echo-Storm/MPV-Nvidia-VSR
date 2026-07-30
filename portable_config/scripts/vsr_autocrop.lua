@@ -67,6 +67,20 @@ local options = {
 
     -- Whether to suppress the OSD message when crop/VSR are applied.
     suppress_osd = false,
+
+    -- Whether to also request NVIDIA RTX Video HDR (SDR->HDR enhancement)
+    -- from the same d3d11vpp filter used for VSR upscaling. Requires mpv
+    -- 0.40+ (d3d11vpp's nvidia-true-hdr suboption) and RTX Video HDR
+    -- enabled in the NVIDIA app. Off by default -- this only ever engages
+    -- when the display is confirmed already in HDR mode via the companion
+    -- mpv-display-plugin (see hdr-mode.lua, whose own default hdr_mode=pass
+    -- already assumes HDR is passed through rather than switched live, so
+    -- there's no race with this script's own once-per-file check). mpv's
+    -- own nvidia-true-hdr filter has no display-state check built in and
+    -- visibly misbehaves (wrong colors) if applied on an SDR display --
+    -- https://github.com/mpv-player/mpv/issues/17800 -- so this script
+    -- does that gating itself rather than trusting the filter to.
+    nvidia_true_hdr = false,
 }
 
 require "mp.options".read_options(options, "vsr_autocrop")
@@ -181,31 +195,56 @@ local function apply_combined(crop_meta)
         scale = math.floor(scale * 10) / 10  -- round down to nearest 0.1
     end
 
+    -- p010/p016 (10-bit HW decode) and other formats are excluded here --
+    -- NVIDIA VSR support for 10-bit is inconsistent, and RTX Video HDR is
+    -- an SDR->HDR enhancement, so an already-HDR (10-bit) source is out of
+    -- scope for both anyway.
+    local is_sdr_pixfmt  = (pixfmt == "nv12" or pixfmt == "yuv420p")
+    local upscale_wanted = scale and scale > 1
+    local hdr_wanted = options.nvidia_true_hdr and is_sdr_pixfmt and
+        mp.get_property_native("user-data/display-info/hdr-status") == "on"
+
     local vsr_applied_now = false
-    if scale and scale > 1 then
-        if pixfmt == "nv12" or pixfmt == "yuv420p" then
-            -- Check success before trusting VSR was actually applied --
+    local hdr_applied_now = false
+    if upscale_wanted or hdr_wanted then
+        if is_sdr_pixfmt then
+            -- scale=1 (no resize) is used whenever upscaling itself isn't
+            -- wanted -- content already at/above display resolution, or
+            -- this insert is for HDR-only reasons. `scale` can be a real
+            -- sub-1 value here (content larger than the display/window),
+            -- and using it unguarded would silently downscale the frame
+            -- as a side effect of an HDR-only apply -- gate on
+            -- upscale_wanted explicitly rather than just nil-checking.
+            local filter = "@vsr:d3d11vpp:scaling-mode=nvidia:scale=" .. (upscale_wanted and scale or 1)
+            if hdr_wanted then
+                -- x2bgr10: a 10-bit output format is required to actually
+                -- carry the enhanced range out of the filter.
+                filter = filter .. ":format=x2bgr10:nvidia-true-hdr"
+            end
+            -- Check success before trusting VSR/HDR was actually applied --
             -- otherwise a failed insert (unsupported GPU, driver hiccup)
             -- still marks vsr_was_applied=true, and the vf observer
             -- below would then re-trigger a full re-evaluation on every
             -- unrelated filter toggle for the rest of the file, since
             -- each retry fails the same way.
-            if mp.command("vf append @vsr:d3d11vpp:scaling-mode=nvidia:scale=" .. scale) then
-                vsr_applied_now = true
+            if mp.command("vf append " .. filter) then
+                vsr_applied_now = upscale_wanted
+                hdr_applied_now = hdr_wanted
                 vsr_was_applied = true
             else
                 mp.msg.warn("Failed to apply @vsr filter (unsupported GPU/driver?)")
             end
         else
-            -- p010/p016 (10-bit HW decode) and other formats land here.
-            -- NVIDIA VSR support for 10-bit is inconsistent; skipping to avoid errors.
-            mp.msg.info("VSR skipped: unsupported pixel format " .. tostring(pixfmt))
+            mp.msg.info("VSR/HDR skipped: unsupported pixel format " .. tostring(pixfmt))
         end
     end
 
     local function report(cropped)
-        if vsr_applied_now then
-            mp.osd_message("NVIDIA VSR: " .. scale .. "x upscale"
+        if vsr_applied_now or hdr_applied_now then
+            local parts = {}
+            if vsr_applied_now then table.insert(parts, scale .. "x upscale") end
+            if hdr_applied_now then table.insert(parts, "RTX HDR") end
+            mp.osd_message("NVIDIA " .. table.concat(parts, " + ")
                 .. (cropped and " (cropped)" or ""), 2)
         end
     end
@@ -382,8 +421,18 @@ local function toggle_auto_crop()
     mp.osd_message("auto-crop " .. (options.auto_crop and "enabled" or "disabled"), 2)
 end
 
+-- Toggles NVIDIA RTX Video HDR enhancement. Takes effect on the next
+-- crop/VSR evaluation (next file load, or the manual "c" toggle) -- same
+-- lazy-apply convention as toggle_auto_crop above, rather than forcing an
+-- immediate re-evaluation of the current file.
+local function toggle_nvidia_true_hdr()
+    options.nvidia_true_hdr = not options.nvidia_true_hdr
+    mp.osd_message("NVIDIA RTX HDR " .. (options.nvidia_true_hdr and "enabled" or "disabled"), 2)
+end
+
 mp.add_key_binding("C", "toggle_crop", on_toggle)
 mp.add_key_binding(nil, "toggle_auto_crop", toggle_auto_crop)
+mp.add_key_binding(nil, "toggle_nvidia_true_hdr", toggle_nvidia_true_hdr)
 mp.register_event("file-loaded", on_file_loaded)
 mp.register_event("end-file", clear_all)
 

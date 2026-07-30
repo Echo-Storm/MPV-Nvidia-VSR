@@ -77,8 +77,12 @@ local function screenshot_done()
     if options.short_saved_message then
         mp.osd_message("Screenshot saved", 2)
     else
-        local dir = mp.command_native({"expand-path", "~~" .. mp.get_property("screenshot-directory")})
-            :gsub("\\", "/")
+        -- screenshot-directory already stores a "~~desktop/..." placeholder
+        -- (from options.save_location), so expand-path takes it as-is --
+        -- prepending another "~~" here previously produced a broken
+        -- "~~~~desktop/..." path.
+        local dir = mp.command_native({"expand-path", mp.get_property("screenshot-directory") or ""})
+        dir = (dir or ""):gsub("\\", "/")
         mp.osd_message("Saved to: " .. dir, 2)
     end
 end
