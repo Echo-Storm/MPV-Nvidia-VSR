@@ -1,0 +1,22 @@
+# Runtime binaries -- downloaded/managed by 1_Full_Latest_MPV_Installer.ps1,
+# not tracked as source (mirrors how mpv.exe/ffmpeg.exe/yt-dlp.exe have
+# always been kept out of git in practice)
+mpv.exe
+ffmpeg.exe
+ffplay.exe
+ffprobe.exe
+yt-dlp.exe
+guessit.exe
+.guessit_last_version.txt
+
+# Temporary 7-Zip fallback the installer downloads/removes itself;
+# ignored defensively in case a crash mid-run leaves it behind
+/7z/
+
+# mpv shader cache -- regenerated automatically, not source
+portable_config/shaders/cache/
+
+# Testing artifacts
+*.log
+samplevideo*.mp4
+portable_config.zip

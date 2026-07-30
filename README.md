@@ -68,6 +68,7 @@ MPV/
     │   ├── reload.lua                    ← auto-reload stalled streams
     │   ├── hdr-mode.lua                  ← SDR/HDR auto-switch
     │   ├── display-info.dll              ← mpv-display-plugin, HDR display info for hdr-mode.lua
+    │   ├── prefer_surround_echostorm.lua ← auto-selects the highest-channel-count audio track (Echostorm)
     │   └── autochapters/main.lua         ← auto-detect anime OP/ED chapters (needs guessit.exe, see below)
     ├── script-opts/
     │   ├── modernz.conf
@@ -80,6 +81,7 @@ MPV/
     │   ├── chapterskip.conf
     │   ├── reload.conf
     │   ├── hdr-mode.conf
+    │   ├── prefer_surround_echostorm.conf
     │   └── autochapters.conf
     └── shaders/
         └── cache/
@@ -98,7 +100,7 @@ MPV/
 - **Audio normalization:** `dynaudnorm` available via `af=` in `mpv.conf` (commented out by default — uncomment to enable)
 - **Network buffering:** Cache and readahead configured for HLS/live stream stability
 - **UI:** Borders enabled, windowed by default, taskbar progress enabled
-- **File dialogs:** `Ctrl+O` opens files, `Ctrl+Shift+O` opens a folder, `Ctrl+Shift+S` adds a subtitle, `Ctrl+Shift+A` adds an audio track — all via native Windows dialogs, also reachable from the right-click menu
+- **File dialogs:** `Ctrl+O` opens files, `Ctrl+Shift+O` opens a folder, `Ctrl+U` opens a URL, `Ctrl+Shift+S` adds a subtitle, `Ctrl+Shift+A` adds an audio track — all via native Windows dialogs, also reachable from the right-click menu
 - **Right-click menu:** mpv's full default context menu (`menu.conf`) — playback, tracks, video/audio/subtitle controls, window, tools, etc. — plus Open File/Folder/Subtitle/Audio at the top of the Open submenu, and runtime toggles for crop, auto-crop mode, chapter-skip, and HDR mode (see below)
 - **Stream quality:** `ytdl-format` auto-adjusts for YouTube, Twitch, and Kick (720p cap by default), leaving other sites on `mpv.conf`'s default — pairs well with RTX VSR upscaling lower-res source
 - **Auto-crop:** black bars auto-detected and cropped as part of the same evaluation that decides VSR's scale factor (`vsr_autocrop.lua`, see Changelog for why these can't be separate scripts). `c` toggles/undoes the current crop+VSR state manually (`C`, uppercase, is taken by the aspect-ratio cycle); auto-crop mode itself can be toggled from the right-click `&Video` menu
@@ -106,6 +108,7 @@ MPV/
 - **Auto chapters:** missing OP/ED chapters looked up automatically for anime files (requires `guessit.exe`, installed automatically by script 1 — or downloaded manually from [guessit-io/guessit releases](https://github.com/guessit-io/guessit/releases) and dropped in the install root; and `curl`, built into Windows 10/11) — manual search/database-update also in the right-click `&Chapters` menu
 - **Stream auto-reload:** a stalled/dead network stream automatically reloads from its last position (`Ctrl+R` to trigger manually, also in the right-click Playback menu)
 - **HDR:** [mpv-display-plugin](https://github.com/dyphire/mpv-display-plugin) (`scripts/display-info.dll`) provides display HDR capability info to `hdr-mode.lua`. Defaults to `hdr_mode=pass` (passes HDR through when the display is already in HDR mode; no automatic OS-level HDR switching, no flicker risk). Cycle `noth`/`switch`/`pass` from the right-click `&Window` menu
+- **Surround audio preferred automatically:** on file load, auto-selects whichever audio track reports the highest channel count (`prefer_surround_echostorm.lua`) — mpv's own `--aid=auto` has no channel-count preference and can land on a lesser stereo/mono track when multiple tracks are ambiguously flagged "default" in the container
 
 ---
 
@@ -131,6 +134,12 @@ MPV/
 ---
 
 ## 📋 Changelog
+
+### 2026-07-30 — v1.0.13: Auto-Prefer Surround Audio, .gitignore, Repo Description
+
+- **New — `prefer_surround_echostorm.lua`**: on file load, auto-selects whichever audio track reports the highest channel count. Found via `mpv.log` while testing: a file (Big Buck Bunny's `bbb_sunflower_2160p_60fps_normal.mp4` test clip) with both an mp3 2ch track and an ac3 6ch track, both flagged `default` in the container, had mpv's own `--aid=auto` land on the 2ch one — confirmed in the log at file-load (`[af] [in] 48000Hz stereo 2ch`). mpv's own manual notes track auto-selection "sometimes expose[s] behavior that may appear strange" and has no channel-count preference; the existing `trackselect` community script wasn't a fit either (it matches by track *title* text, not channel count). Only acts once per file at load; manual track switches mid-playback are left alone.
+- **New — `.gitignore`**. Never existed before; runtime binaries (`mpv.exe`, `ffmpeg.exe`, `yt-dlp.exe`, `guessit.exe`), the mpv shader cache, test artifacts (`*.log`, `samplevideo*.mp4`), and the old backup zip pattern had only stayed out of git because of manual care during every sync this whole update effort, not because anything actually prevented them from being committed.
+- **GitHub repo description updated** to actually mention the two dozen+ custom/tuned scripts now bundled — the old description only described the original VSR-only script from before this whole update effort.
 
 ### 2026-07-30 — v1.0.12: Troubleshooting Section, audio-stream-silence Disabled, Repo Topics
 
