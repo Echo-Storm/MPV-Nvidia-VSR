@@ -130,13 +130,14 @@ MPV/
 - `hidetimeout` 1500 → 3000 — OSC now stays visible 3 seconds after the last mouse movement instead of 1.5
 
 **New — autocrop.lua (mpv core, `TOOLS/lua/autocrop.lua`):**
-- Auto-detects and crops black bars ~4 seconds into playback, using the `video-crop` property (not the `vf` chain), so it doesn't collide with `auto_nvidia_vsr.lua`'s `@vsr` filter
+- Auto-detects and crops black bars ~2 seconds into playback (`auto_delay=1` + `detect_seconds=1`, tuned to land before `auto_nvidia_vsr.lua`'s 3s trigger — see below), using the `video-crop` property (not the `vf` chain), so it doesn't collide with `auto_nvidia_vsr.lua`'s `@vsr` filter
 - Default manual toggle key is uppercase `C`, already taken by the aspect-ratio cycle in `input.conf` — remapped to lowercase `c`, also added to the right-click `&Video` menu
 
 **Fix — auto_nvidia_vsr.lua, crop-aware upscaling:**
 - `video-crop` is applied by the VO *after* the entire `vf` chain runs (confirmed against mpv's own source, `player/video.c`'s `apply_video_crop()`) — so `@vsr` was upscaling the raw, uncropped frame and computing its scale factor against the full frame size (bars included), meaning genuinely letterboxed/pillarboxed content that would benefit from upscaling once cropped was being silently skipped or under-scaled
 - Now reads the active `video-crop` rectangle and uses its dimensions for the scale calculation instead of raw `width`/`height`, falling back to raw dimensions when nothing is cropped
-- Also fixed a timing race: `autocrop`'s default crop delay (4s) lands after `auto_nvidia_vsr`'s own 3s trigger already fired once with the uncropped size — added a `video-crop` property observer so VSR re-evaluates immediately whenever the crop rectangle appears, changes, or clears, without adding extra delay
+- Also fixed a timing race: autocrop's total crop delay is `auto_delay + detect_seconds` (5s at upstream defaults), which lands after `auto_nvidia_vsr`'s own 3s trigger already fired once with the uncropped size — added a `video-crop` property observer so VSR re-evaluates immediately whenever the crop rectangle appears, changes, or clears, without adding extra delay
+- `autocrop.conf`'s `auto_delay` also tuned from the upstream default of 4 down to 1 (total ~2s) so crop lands a full second *before* VSR's 3s check fires at all, avoiding a one-time visible rescale "pop" mid-intro — trade-off is slightly higher risk of a long fade-in/logo card being mis-detected as letterboxing on specific releases; raise it back if that happens
 - An actual `vf crop`/`lavfi-crop` filter would let VSR see the cropped frame directly and avoid upscaling the bars at all, but the mpv manual explicitly notes `video-crop` "works with hwdec, unlike the equivalent lavfi-crop" — so that approach was ruled out to keep hardware decoding intact
 
 **New — chapterskip.lua (po5/chapterskip):**
