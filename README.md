@@ -53,6 +53,7 @@ MPV/
 └── portable_config/
     ├── mpv.conf
     ├── input.conf
+    ├── menu.conf            ← right-click context menu (mpv default + Open File/Subtitle/Audio)
     ├── fonts/               ← Netflix Sans + ModernZ icon fonts
     ├── scripts/
     │   ├── modernz.lua                   ← OSC UI
@@ -87,7 +88,8 @@ MPV/
 - **Audio normalization:** `dynaudnorm` available via `af=` in `mpv.conf` (commented out by default — uncomment to enable)
 - **Network buffering:** Cache and readahead configured for HLS/live stream stability
 - **UI:** Borders enabled, windowed by default, taskbar progress enabled
-- **File dialogs:** `Ctrl+O` opens files, `Ctrl+Shift+S` adds a subtitle, `Ctrl+Shift+A` adds an audio track — all via the native Windows file picker
+- **File dialogs:** `Ctrl+O` opens files, `Ctrl+Shift+S` adds a subtitle, `Ctrl+Shift+A` adds an audio track — all via the native Windows file picker, also reachable from the right-click menu
+- **Right-click menu:** mpv's full default context menu (`menu.conf`) — playback, tracks, video/audio/subtitle controls, window, tools, etc. — plus Open File/Subtitle/Audio at the top of the Open submenu
 - **Stream quality:** `ytdl-format` auto-adjusts for YouTube, Twitch, and Kick (720p cap by default), leaving other sites on `mpv.conf`'s default — pairs well with RTX VSR upscaling lower-res source
 
 ---
@@ -97,7 +99,7 @@ MPV/
 - All scripts are silent, reversible, and require no user input except to exit
 - Designed for Windows 10/11 with PowerShell 3+ (written for 7)
 - No registry bloat, no filetype hijacking, no start menu shortcuts
-- Requires mpv 0.40+ for `select.lua` interactive menus (`load-select-ui=yes`)
+- Requires mpv 0.40+ for `select.lua` interactive menus (`load-select=yes`, mpv's actual default — `load-select-ui` was never a real option, see v1.0.3 changelog)
 - RTX VSR requires `gpu-api=d3d11` and an Nvidia RTX card with VSR enabled in the Nvidia Control Panel
 
 ---
@@ -105,6 +107,15 @@ MPV/
 ## 📋 Changelog
 
 ### 2026-07-29 — v1.0.0: Full Script Sync & Bug Fix
+
+### 2026-07-29 — v1.0.3: Fix load-select, Add Right-Click Menu
+
+**Bug fix — mpv.conf:**
+- `load-select-ui` was never a real mpv option. It doesn't exist anywhere in mpv's source or history — mpv silently ignores unknown `mpv.conf` keys with a log warning rather than failing to start, so this line has done nothing since it was added (2026-03-17). The real option is `load-select` (bool, default `yes`), which is what actually controls whether `select.lua` loads. Since it already defaults to `yes`, the interactive select menus were never actually affected by this typo either way — but it's now set explicitly and correctly.
+
+**New — menu.conf:**
+- Added mpv's full default right-click context menu (previously this repo had none, so mpv fell back to nothing configured beyond the built-in minimal set)
+- Added `&File...`, `Add &subtitle...`, `Add &audio track...` at the top of the `Ope&n` submenu, wired to `open_file.lua`'s Windows file dialog bindings
 
 ### 2026-07-29 — v1.0.2: File Dialogs & Auto Stream Quality
 
@@ -159,7 +170,7 @@ MPV/
 ### 2026-03-17 — Audit & Modernz 0.3.0 Update
 
 **mpv.conf:**
-- Added `load-select-ui=yes` — enables built-in interactive select menus
+- Added `load-select-ui=yes` — enables built-in interactive select menus (**correction, see v1.0.3**: `load-select-ui` was never a real mpv option — it silently no-op'd this whole time. The select menus were on regardless, since mpv's real `load-select` option defaults to `yes`.)
 - Added `cache=yes`, `demuxer-max-bytes=50MiB`, `demuxer-readahead-secs=20`, `stream-buffer-size=512KiB` — HLS/live stream stability
 - Added `audio-stream-silence=yes` — prevents silent audio on playlist-next for demuxed HLS streams
 - Changed `alang=ja,jp,jpn,en,eng` → `alang=en,eng,und,auto` — removed Japanese priority, added fallback for untagged streams
