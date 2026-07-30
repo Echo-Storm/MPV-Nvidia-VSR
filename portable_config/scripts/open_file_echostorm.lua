@@ -12,6 +12,14 @@
     a genuine native Windows dialog, just the classic tree-view style
     rather than the modern Explorer-style picker used by open()/add_*().
 
+    Also added open_url(), using VB.NET's InputBox (via the
+    Microsoft.VisualBasic assembly, reachable from PowerShell) for a
+    real native popup with a text field, matching open()/open_folder()/
+    add_*() instead of using mpv's own console input. Like
+    open_folder()'s BrowseForFolder, this is a legacy Win32-style
+    dialog, so it renders in light mode regardless of system theme --
+    same as the folder picker, not something fixable from here.
+
 --]]
 
 local utils = require "mp.utils"
@@ -112,7 +120,22 @@ local function open_folder()
     end
 end
 
+local function open_url()
+    local stdout = invoke_dialog([[
+        Add-Type -AssemblyName Microsoft.VisualBasic
+        [Microsoft.VisualBasic.Interaction]::InputBox("Enter a URL to open:", "Open URL", "")
+    ]])
+
+    if not stdout then return end
+
+    local url = stdout:match("[^\r\n]+")
+    if url then
+        mp.commandv("loadfile", url, "replace")
+    end
+end
+
 mp.add_key_binding(nil, "open", open)
 mp.add_key_binding(nil, "open_folder", open_folder)
+mp.add_key_binding(nil, "open_url", open_url)
 mp.add_key_binding(nil, "add_subtitle", add_subtitle)
 mp.add_key_binding(nil, "add_audio", add_audio)

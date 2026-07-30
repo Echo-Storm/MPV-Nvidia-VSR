@@ -62,7 +62,7 @@ MPV/
     │   ├── thumbfast.lua                 ← seekbar thumbnails
     │   ├── pause_indicator_lite.lua      ← pause overlay
     │   ├── playlistmanager.lua           ← playlist OSD
-    │   ├── open_file.lua                 ← native Windows open file/folder/subtitle/audio dialog (Echostorm: added open folder)
+    │   ├── open_file_echostorm.lua       ← native Windows open file/folder/URL/subtitle/audio dialogs (Echostorm: added folder, URL)
     │   ├── ytdlautoformat.lua            ← auto ytdl-format per domain (YouTube, Twitch, Kick)
     │   ├── chapterskip.lua               ← auto-skip OP/ED/preview chapters
     │   ├── reload.lua                    ← auto-reload stalled streams
@@ -120,6 +120,16 @@ MPV/
 ---
 
 ## 📋 Changelog
+
+### 2026-07-30 — v1.0.11: Open URL, Menu Symmetry, Testing Log
+
+- **`open_file.lua` renamed to `open_file_echostorm.lua`** — it's diverged enough from the upstream ModernZ fork (folder + URL dialogs added) to deserve the same `_echostorm` naming convention as `screenshotfolder_echostorm.lua`. `input.conf`/`menu.conf` bindings updated from `open_file/*` to `open_file_echostorm/*` to match (mpv derives a script's binding-path name from its filename).
+- **New — `open_url()`**: a genuine native Windows input box (VB.NET's `InputBox`, reachable from PowerShell via the `Microsoft.VisualBasic` assembly) prompting for a URL to load. `Ctrl+U`, plus `Open URL...` in the right-click `Ope&n` submenu. Matches `open()`/`open_folder()`/`add_*()`'s native-dialog pattern rather than using mpv's own console input, which was the first pass but inconsistent with the others.
+- Right-click menu: `&File...` → `Open &File...`, matching `Open &folder...`/`Open &URL...` for consistency (purely cosmetic, no functional change).
+- `mpv.conf`: added `log-file=~~/mpv.log`, truncated fresh on every launch (not unbounded growth), forced to at least `-v -v`. Meant for the current active testing/debugging period — flagged with a comment to remove once that's done, not meant to be permanent.
+- Confirmed (not a bug here): `Microsoft.VisualBasic`, `PresentationFramework` (WPF), and `Shell.Application` are all standard components of Windows 10/11 itself (.NET Framework + core Shell), and `powershell.exe` (Windows PowerShell 5.1, not the separate optional PowerShell 7) has shipped with every Windows 10/11 install since release — all three dialogs work with zero extra setup on any Windows 10/11 machine.
+- Confirmed a Kick.com video failing to load is [yt-dlp#17284](https://github.com/yt-dlp/yt-dlp/issues/17284), an open upstream bug (VODs/Live/Clips all affected by a recent Kick site change) — not a config issue here, should resolve itself once yt-dlp ships a fix.
+- **Known, low-priority, "if I get around to it" limitation:** `open_folder()`'s `BrowseForFolder` and `open_url()`'s `InputBox` are both legacy pre-Vista Windows APIs that predate dark mode and were never retrofitted for it, so they render in light mode regardless of system theme — unlike `open()`/`add_subtitle()`/`add_audio()`'s modern `IFileDialog`-based picker, which follows system dark/light mode automatically for free. The only ways to change this are a fragile, undocumented DWM hack that only darkens the title bar (leaving the actual body/controls light — a visually inconsistent half-fix) or a fully custom-built WPF dialog styled dark by hand. Neither is a small change, and it's cosmetic only, so left as-is for now.
 
 ### 2026-07-30 — v1.0.10: guessit.exe and mpv-display-plugin Actually Installed
 
