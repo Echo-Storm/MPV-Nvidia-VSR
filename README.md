@@ -119,7 +119,24 @@ MPV/
 
 ---
 
+## 🔧 Troubleshooting
+
+- **Audio cuts out, drops, or goes silent for a moment right after seeking, unpausing, or skipping to the next track/file.** Known issue with older or budget HDMI A/V receivers (AVRs) / soundbars that ignore or drop the first bit of audio every time HDMI audio output stops and restarts. Fix: uncomment `audio-stream-silence=yes` in `mpv.conf` (commented out by default since v1.0.12 — mpv's own manual calls it "strongly discouraged" since it changes A/V-sync and underrun handling for every file, so it's opt-in rather than on by default now).
+- **Audio is too loud/quiet, or inconsistent between quiet and loud scenes/streams.** Uncomment `af=lavfi=[dynaudnorm=f=150:g=15:p=0.95]` in `mpv.conf` (commented out by default) — a single-pass, live-stream-safe loudness normalizer. Unlike `loudnorm`, it doesn't need to buffer the whole file first, so it's safe for live/HLS streams too.
+- **Kick.com videos won't load / fail to fetch metadata.** Confirmed to be [yt-dlp#17284](https://github.com/yt-dlp/yt-dlp/issues/17284), an open upstream bug — Kick changed something site-side that broke yt-dlp's extractor (VODs, Live, and Clips all affected). Not a config issue here; should resolve itself once yt-dlp ships a fix. Re-run `1_Full_Latest_MPV_Installer.ps1` periodically to pick up new yt-dlp versions.
+- **`autochapters` warns "couldn't parse media filename, is guessit installed?"** Needs `guessit.exe` in the install root — `1_Full_Latest_MPV_Installer.ps1` downloads this automatically; if you installed before that was added, just re-run the installer.
+- **HDR isn't switching/passing through.** `hdr-mode.lua` needs the companion [mpv-display-plugin](https://github.com/dyphire/mpv-display-plugin) (`scripts/display-info.dll`) for display capability info — without it, `hdr_mode` has nothing to act on.
+- **The Open Folder / Open URL dialogs look light-mode even in a dark theme.** Expected — both use legacy pre-Vista Windows APIs (`Shell.Application.BrowseForFolder`, VB.NET's `InputBox`) that predate dark mode and were never retrofitted for it. Open File/Add Subtitle/Add Audio use the modern dialog, which does follow system theme automatically.
+
+---
+
 ## 📋 Changelog
+
+### 2026-07-30 — v1.0.12: Troubleshooting Section, audio-stream-silence Disabled, Repo Topics
+
+- **`audio-stream-silence=yes` disabled** in `mpv.conf` (now commented out, not deleted). mpv's own manual calls it "strongly discouraged" — it changes A/V-sync and underrun handling globally, for every file, to work around one specific class of problem (older/budget HDMI AVRs that drop audio on stream restart). Was originally added for a different reason (silent audio on playlist-next for demuxed HLS streams) that hasn't actually been a problem in practice. Comment expanded with the actual symptom keywords (receiver, AVR, HDMI, audio drops/cuts out) so it's easy to find and re-enable if anyone actually needs it.
+- **New — Troubleshooting section in the README**, so every disabled-but-available fix and known non-issue is documented and searchable in one place: the audio-stream-silence fix above, `dynaudnorm` audio normalization (also disabled by default in `mpv.conf`), the Kick.com/yt-dlp#17284 upstream bug, `autochapters` needing `guessit.exe`, HDR needing the companion display plugin, and the light-mode-only legacy dialogs.
+- **GitHub repo topics added** (previously had none at all): `mpv`, `mpv-config`, `nvidia`, `nvidia-rtx`, `rtx`, `vsr`, `video-super-resolution`, `windows`, `video-player`, `yt-dlp`, `hdr`, `autocrop`, `powershell`, `modernz` — should help the repo actually surface in GitHub's topic browsing/search instead of being invisible to it.
 
 ### 2026-07-30 — v1.0.11: Open URL, Menu Symmetry, Testing Log
 
