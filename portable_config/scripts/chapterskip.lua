@@ -81,5 +81,18 @@ function chapterskip(_, current)
     end
 end
 
+-- Echostorm Edition: toggle chapter-skip on/off at runtime. Writes back
+-- through script-opts (not just the local table), since chapterskip()
+-- above calls read_options() on every chapter change, which would
+-- otherwise immediately overwrite an in-memory-only toggle.
+local function toggle_enabled()
+    local new_state = not options.enabled
+    mp.commandv("change-list", "script-opts", "append", "chapterskip-enabled=" .. tostring(new_state))
+    options.enabled = new_state
+    mp.osd_message("chapterskip: " .. (new_state and "enabled" or "disabled"), 2)
+end
+
+mp.add_key_binding(nil, "toggle_enabled", toggle_enabled)
+
 mp.observe_property("chapter", "number", chapterskip)
 mp.register_event("file-loaded", function() skipped = {} end)

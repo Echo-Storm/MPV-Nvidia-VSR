@@ -99,13 +99,13 @@ MPV/
 - **Network buffering:** Cache and readahead configured for HLS/live stream stability
 - **UI:** Borders enabled, windowed by default, taskbar progress enabled
 - **File dialogs:** `Ctrl+O` opens files, `Ctrl+Shift+O` opens a folder, `Ctrl+Shift+S` adds a subtitle, `Ctrl+Shift+A` adds an audio track — all via native Windows dialogs, also reachable from the right-click menu
-- **Right-click menu:** mpv's full default context menu (`menu.conf`) — playback, tracks, video/audio/subtitle controls, window, tools, etc. — plus Open File/Folder/Subtitle/Audio at the top of the Open submenu
+- **Right-click menu:** mpv's full default context menu (`menu.conf`) — playback, tracks, video/audio/subtitle controls, window, tools, etc. — plus Open File/Folder/Subtitle/Audio at the top of the Open submenu, and runtime toggles for autocrop, auto-crop mode, chapter-skip, and HDR mode (see below)
 - **Stream quality:** `ytdl-format` auto-adjusts for YouTube, Twitch, and Kick (720p cap by default), leaving other sites on `mpv.conf`'s default — pairs well with RTX VSR upscaling lower-res source
-- **Auto-crop:** black bars auto-detected and cropped 4 seconds into playback (`c` to toggle/undo manually — `C`, uppercase, is taken by the aspect-ratio cycle)
-- **Chapter skip:** opening, ending, and next-episode preview chapters auto-skipped when present
-- **Auto chapters:** missing OP/ED chapters looked up automatically for anime files (requires `guessit.exe`, installed automatically by script 1; and `curl`, built into Windows 10/11)
-- **Stream auto-reload:** a stalled/dead network stream automatically reloads from its last position (`Ctrl+R` to trigger manually)
-- **HDR auto-switch:** wired in but inert by default — needs [mpv-display-plugin](https://github.com/dyphire/mpv-display-plugin) installed separately, then set `hdr_mode=switch` or `pass` in `hdr-mode.conf`
+- **Auto-crop:** black bars auto-detected and cropped ~2 seconds into playback (tuned to land before VSR's own trigger, see Changelog). `c` toggles/undoes the current crop manually (`C`, uppercase, is taken by the aspect-ratio cycle); auto-crop mode itself can be toggled from the right-click `&Video` menu
+- **Chapter skip:** opening, ending, and next-episode preview chapters auto-skipped when present — toggle from the right-click `&Chapters` menu
+- **Auto chapters:** missing OP/ED chapters looked up automatically for anime files (requires `guessit.exe`, installed automatically by script 1; and `curl`, built into Windows 10/11) — manual search/database-update also in the right-click `&Chapters` menu
+- **Stream auto-reload:** a stalled/dead network stream automatically reloads from its last position (`Ctrl+R` to trigger manually, also in the right-click Playback menu)
+- **HDR auto-switch:** wired in but inert by default — needs [mpv-display-plugin](https://github.com/dyphire/mpv-display-plugin) installed separately. Cycle `noth`/`switch`/`pass` from the right-click `&Window` menu once that's installed
 
 ---
 
@@ -120,6 +120,17 @@ MPV/
 ---
 
 ## 📋 Changelog
+
+### 2026-07-29 — v1.0.6: Context Menu Toggles
+
+None of `autocrop`, `chapterskip`, or `hdr-mode` exposed a way to flip their behavior at runtime beyond editing config files, so added small local toggle functions to each (documented inline as "Echostorm Edition" additions, same pattern as `auto_nvidia_vsr.lua`/`screenshotfolder_echostorm.lua`) and wired them into `menu.conf`:
+
+- **autocrop.lua:** `toggle_auto()` — flips the `auto` option itself (distinct from the existing `toggle_crop`, which only crops/uncrops the current file). Applies immediately to the current file when re-enabled. Menu: `&Video` → `Toggle auto-crop`
+- **chapterskip.lua:** `toggle_enabled()` — writes through `change-list script-opts` rather than just the local table, since `chapterskip()` calls `read_options()` on every chapter change and would otherwise immediately clobber an in-memory-only toggle. Menu: `&Chapters` → `Toggle auto-skip OP/ED/preview`
+- **hdr-mode.lua:** `cycle_mode()` — cycles `noth` → `switch` → `pass` → `noth`; `o.hdr_mode` is read live throughout the script so this takes effect immediately. Menu: `&Window` → `Cycle HDR mode`
+- **autochapters:** already exposed `search`/`update` script-bindings upstream with no default key and no menu entry — added both to the menu: `&Chapters` → `Search for chapters online` / `Update chapter database`
+- `&Chapters` restructured from a single `$chapters` token into a proper submenu (`&List` sub-item + the above)
+- Left `reload.lua`'s auto-detection timers and `ytdlautoformat.lua` without toggles — the former would need deeper changes to its timer re-init logic to be safe, the latter doesn't have any existing hook to build on; both are reasonably "set and forget" already
 
 ### 2026-07-29 — v1.0.4: Open Folder, Crop/Chapter/Reload/HDR Scripts
 

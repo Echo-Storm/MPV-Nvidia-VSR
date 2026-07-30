@@ -290,6 +290,19 @@ local function on_toggle()
     detect_crop()
 end
 
+-- Echostorm Edition: toggle the "auto" option itself at runtime, distinct
+-- from on_toggle() above which only crops/uncrops the current file. This
+-- flips whether autocrop runs at all, and applies immediately to the
+-- current file when turning it back on.
+local function toggle_auto()
+    options.auto = not options.auto
+    mp.osd_message("autocrop: auto-crop " .. (options.auto and "enabled" or "disabled"), 2)
+    if options.auto then
+        on_start()
+    end
+end
+
 mp.add_key_binding("C", "toggle_crop", on_toggle)
+mp.add_key_binding(nil, "toggle_auto", toggle_auto)
 mp.register_event("end-file", cleanup)
 mp.register_event("file-loaded", on_start)

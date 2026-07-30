@@ -328,6 +328,18 @@ local function on_idle(_, active)
     end
 end
 
+-- Echostorm Edition: cycle hdr_mode noth -> switch -> pass -> noth at
+-- runtime. o.hdr_mode is read live throughout this script (not cached),
+-- so this takes effect immediately, no restart needed. switch/pass are
+-- no-ops without the companion mpv-display-plugin installed.
+local hdr_mode_cycle = { noth = "switch", switch = "pass", pass = "noth" }
+local function cycle_mode()
+    o.hdr_mode = hdr_mode_cycle[o.hdr_mode] or "noth"
+    mp.osd_message("hdr-mode: " .. o.hdr_mode, 2)
+end
+
+mp.add_key_binding(nil, "cycle_mode", cycle_mode)
+
 mp.register_event("start-file", on_start)
 mp.register_event("end-file", on_end)
 mp.observe_property("idle-active", "native", on_idle)
