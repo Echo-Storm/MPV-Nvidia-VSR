@@ -8,9 +8,13 @@
 -- and an ac3 6ch track, BOTH flagged default, auto-selected the 2ch one.
 --
 -- On every file load, selects whichever audio track reports the
--- highest channel count, so a receiver capable of full surround
--- actually gets it when the file has it, instead of silently landing
--- on a lesser stereo/mono track. Only acts once per file (at
+-- highest channel count -- but ONLY among tracks sharing the same
+-- language as whatever mpv's own --alang-based selection already
+-- landed on, so a foreign-language track with more channels never
+-- silently overrides your language preference (mpv.conf's own
+-- alang=eng,en,und,auto). mpv resolves alang before file-loaded fires,
+-- so this piggybacks on that resolved choice rather than re-implementing
+-- alang's matching logic itself. Only acts once per file (at
 -- file-loaded); manual track switches mid-playback are left alone.
 
 local options = {
@@ -28,9 +32,19 @@ local function pick_best_audio_track()
     local tracks = mp.get_property_native("track-list")
     if not tracks then return end
 
-    local best_id, best_channels = nil, 0
+    local current_lang = nil
     for _, track in ipairs(tracks) do
-        if track.type == "audio" then
+        if track.type == "audio" and track.id == current_aid then
+            current_lang = track.lang
+            break
+        end
+    end
+
+    local best_id, best_channels = current_aid, 0
+    for _, track in ipairs(tracks) do
+        -- track.lang == current_lang also groups untagged tracks
+        -- together correctly, since nil == nil is true in Lua.
+        if track.type == "audio" and track.lang == current_lang then
             local ch = track["demux-channel-count"] or 0
             if ch > best_channels then
                 best_channels = ch
@@ -39,9 +53,10 @@ local function pick_best_audio_track()
         end
     end
 
-    if best_id and best_id ~= current_aid then
+    if best_id ~= current_aid then
         mp.set_property_native("aid", best_id)
-        mp.msg.info("Selected audio track " .. best_id .. " (" .. best_channels .. " channels)")
+        mp.msg.info("Selected audio track " .. best_id .. " (" .. best_channels ..
+            " channels, same language as mpv's default pick)")
     end
 end
 
