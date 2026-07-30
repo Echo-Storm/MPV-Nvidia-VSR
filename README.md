@@ -133,6 +133,12 @@ MPV/
 - Auto-detects and crops black bars ~4 seconds into playback, using the `video-crop` property (not the `vf` chain), so it doesn't collide with `auto_nvidia_vsr.lua`'s `@vsr` filter
 - Default manual toggle key is uppercase `C`, already taken by the aspect-ratio cycle in `input.conf` — remapped to lowercase `c`, also added to the right-click `&Video` menu
 
+**Fix — auto_nvidia_vsr.lua, crop-aware upscaling:**
+- `video-crop` is applied by the VO *after* the entire `vf` chain runs (confirmed against mpv's own source, `player/video.c`'s `apply_video_crop()`) — so `@vsr` was upscaling the raw, uncropped frame and computing its scale factor against the full frame size (bars included), meaning genuinely letterboxed/pillarboxed content that would benefit from upscaling once cropped was being silently skipped or under-scaled
+- Now reads the active `video-crop` rectangle and uses its dimensions for the scale calculation instead of raw `width`/`height`, falling back to raw dimensions when nothing is cropped
+- Also fixed a timing race: `autocrop`'s default crop delay (4s) lands after `auto_nvidia_vsr`'s own 3s trigger already fired once with the uncropped size — added a `video-crop` property observer so VSR re-evaluates immediately whenever the crop rectangle appears, changes, or clears, without adding extra delay
+- An actual `vf crop`/`lavfi-crop` filter would let VSR see the cropped frame directly and avoid upscaling the bars at all, but the mpv manual explicitly notes `video-crop` "works with hwdec, unlike the equivalent lavfi-crop" — so that approach was ruled out to keep hardware decoding intact
+
 **New — chapterskip.lua (po5/chapterskip):**
 - Auto-skips opening/ending/preview chapters when present. `chapterskip.conf` defaults to `skip=opening;ending;preview`
 

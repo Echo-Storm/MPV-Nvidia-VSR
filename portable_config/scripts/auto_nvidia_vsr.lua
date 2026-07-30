@@ -2,18 +2,45 @@
 -- Applies NVIDIA VSR (d3d11vpp) upscaling when the video resolution is below
 -- the display resolution and the pixel format is hardware-decoded.
 -- 3-second delay is intentional: gives hwdec time to settle after file load.
+--
+-- Crop-aware: autocrop.lua's video-crop property is applied by the VO
+-- *after* the whole vf chain runs (confirmed against mpv's own source,
+-- player/video.c apply_video_crop()), so the @vsr filter never actually
+-- sees the cropped frame -- only the raw decoded one, bars included.
+-- Using an actual vf crop filter instead would let VSR see the crop
+-- directly, but the mpv manual explicitly says video-crop "works with
+-- hwdec, unlike the equivalent lavfi-crop", so that would break hardware
+-- decoding. Given that constraint, this script instead reads the current
+-- video-crop rectangle and uses ITS dimensions (not the raw frame size)
+-- to decide whether/how much to upscale, so a letterboxed/pillarboxed
+-- video still gets correctly identified as needing an upscale once
+-- cropped, even though VSR itself still processes the uncropped frame.
 
 local pending_timer  = nil
 local applying       = false  -- guard against re-entrant trigger from vf changes
 local vsr_was_applied = false  -- tracks whether VSR is currently in the chain
+
+-- Returns the effective content width/height: the current video-crop
+-- rectangle's size if autocrop has cropped the frame, otherwise the raw
+-- decoded dimensions.
+local function get_effective_dims()
+    local video_width  = mp.get_property_native("width")
+    local video_height = mp.get_property_native("height")
+
+    local crop = mp.get_property("video-crop") or ""
+    local cw, ch = crop:match("^(%d+)x(%d+)%+")
+    if cw and ch then
+        return tonumber(cw), tonumber(ch)
+    end
+    return video_width, video_height
+end
 
 local function apply_vsr()
     applying = true
 
     local display_width  = mp.get_property_native("display-width")
     local display_height = mp.get_property_native("display-height")
-    local video_width    = mp.get_property_native("width")
-    local video_height   = mp.get_property_native("height")
+    local video_width, video_height = get_effective_dims()
     local pixfmt = mp.get_property_native("video-params/hw-pixelformat")
                or mp.get_property_native("video-params/pixelformat")
 
@@ -89,6 +116,16 @@ mp.register_event("file-loaded", on_file_loaded)
 -- Trigger on format change too (track switch mid-file, hwdec settling)
 mp.observe_property("video-params/pixelformat",    "native", schedule_vsr)
 mp.observe_property("video-params/hw-pixelformat", "native", schedule_vsr)
+
+-- autocrop.lua applies its crop ~4s after file-loaded (auto_delay), which
+-- lands AFTER our own 3s trigger already ran once with the uncropped
+-- size. Re-evaluate immediately (no extra delay -- hwdec has long since
+-- settled by the time autocrop's independent timer fires) whenever the
+-- crop rectangle appears, changes, or is cleared.
+mp.observe_property("video-crop", "string", function()
+    if applying then return end
+    apply_vsr()
+end)
 
 -- Re-apply if vf chain is externally cleared (e.g. user runs 'vf clr')
 -- but NOT when we're the ones changing it, and NOT on videos where VSR
