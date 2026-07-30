@@ -16,15 +16,37 @@
 -- scripts fixes that; the crop rectangle itself has to be scaled by
 -- whatever factor VSR applies. That requires one script owning both.
 --
--- Flow per file: wait <settle_delay> (hwdec settle) -> run cropdetect for
--- <detect_seconds> -> compute VSR's scale factor from the CROPPED content
--- size -> apply @vsr at that scale -> set video-crop using the detected
--- rectangle scaled by that same factor (so it lines up with the frame
--- @vsr actually outputs, not the raw decoded one).
+-- Flow per file: wait <settle_delay> (decoder/pixel-format settle) -> run
+-- cropdetect for <detect_seconds> -> compute VSR's scale factor from the
+-- CROPPED content size -> apply @vsr at that scale -> set video-crop
+-- using the detected rectangle scaled by that same factor (so it lines
+-- up with the frame @vsr actually outputs, not the raw decoded one).
+--
+-- Requires hwdec=d3d11va-copy in mpv.conf (not plain d3d11va). cropdetect
+-- is a plain software filter and can't read a GPU-resident D3D11 surface
+-- directly -- copy-back mode makes every decoded frame land in system RAM
+-- automatically, which cropdetect can read with no special handling.
+-- @vsr (d3d11vpp) still works fine on a copied-back frame: per mpv's own
+-- filter docs, "software frames are automatically uploaded to hardware
+-- for processing", so it re-uploads whatever it's given regardless.
+--
+-- This used to instead toggle hwdec off/on around cropdetect (matching
+-- upstream autocrop.lua, which has to support hwdec setups without a
+-- copy-back mode available). That toggle caused a real, severe bug here:
+-- restoring hwdec is a genuine hardware reinit that isn't guaranteed to
+-- settle synchronously, and if a change notification from OUR OWN
+-- restore landed after we'd already re-armed the observer watching for
+-- it, it re-triggered the whole flow, toggling hwdec again, forever --
+-- and rapid D3D11 device churn from that loop caused a full Windows
+-- BSOD during testing. Since this build's whole premise is an NVIDIA
+-- RTX card with VSR enabled, hwdec=d3d11va-copy is always available
+-- here, so the toggle isn't needed at all -- removing it removes that
+-- entire bug class at the root instead of patching around it.
 
 local options = {
-    -- Seconds after file-loaded before doing anything at all. Gives hwdec
-    -- time to settle. This delay is intentional -- do not remove it.
+    -- Seconds after file-loaded before doing anything at all. Gives the
+    -- decoder time to settle so video-params/hw-pixelformat reads a
+    -- reliable value. This delay is intentional -- do not remove it.
     settle_delay = 3,
 
     -- Whether to auto-detect and crop black bars. VSR upscaling still
@@ -55,11 +77,19 @@ local command_prefix = options.suppress_osd and "no-osd" or ""
 local timers = {
     settle = nil,
     detect_crop = nil,
+    crop_confirm = nil,
 }
 
 local applying       = false  -- guard against re-entrant trigger from vf changes
 local vsr_was_applied = false -- tracks whether @vsr is currently in the chain
-local hwdec_backup    = nil
+local crop_watcher    = nil   -- pending video-out-params/w observer fn, if any
+
+local function unwatch_crop_confirm()
+    if crop_watcher then
+        mp.unobserve_property(crop_watcher)
+        crop_watcher = nil
+    end
+end
 
 local function kill_timer(key)
     if timers[key] then
@@ -78,13 +108,6 @@ local function remove_cropdetect()
     end
 end
 
-local function restore_hwdec()
-    if hwdec_backup then
-        mp.set_property("hwdec", hwdec_backup)
-        hwdec_backup = nil
-    end
-end
-
 local function clear_all()
     -- Strip any existing @vsr filter and video-crop immediately (not
     -- after a delay), so a new file isn't briefly shown through a filter
@@ -94,7 +117,8 @@ local function clear_all()
     remove_cropdetect()
     kill_timer("settle")
     kill_timer("detect_crop")
-    restore_hwdec()
+    kill_timer("crop_confirm")
+    unwatch_crop_confirm()
 
     local vf_current = mp.get_property("vf") or ""
     if vf_current:find("@vsr") then
@@ -115,6 +139,15 @@ local function is_cropable(time_needed)
     end
     local playtime_remaining = mp.get_property_native("playtime-remaining")
     return playtime_remaining and (time_needed + 1) < playtime_remaining
+end
+
+local function set_scaled_crop(crop_meta, factor)
+    local cw = math.floor(crop_meta.w * factor)
+    local ch = math.floor(crop_meta.h * factor)
+    local cx = math.floor(crop_meta.x * factor)
+    local cy = math.floor(crop_meta.y * factor)
+    mp.command(string.format("%s set file-local-options/video-crop %dx%d+%d+%d",
+                              command_prefix, cw, ch, cx, cy))
 end
 
 -- Computes VSR's scale factor for the given content dimensions, applies
@@ -151,9 +184,18 @@ local function apply_combined(crop_meta)
     local vsr_applied_now = false
     if scale and scale > 1 then
         if pixfmt == "nv12" or pixfmt == "yuv420p" then
-            mp.command("vf append @vsr:d3d11vpp:scaling-mode=nvidia:scale=" .. scale)
-            vsr_applied_now = true
-            vsr_was_applied = true
+            -- Check success before trusting VSR was actually applied --
+            -- otherwise a failed insert (unsupported GPU, driver hiccup)
+            -- still marks vsr_was_applied=true, and the vf observer
+            -- below would then re-trigger a full re-evaluation on every
+            -- unrelated filter toggle for the rest of the file, since
+            -- each retry fails the same way.
+            if mp.command("vf append @vsr:d3d11vpp:scaling-mode=nvidia:scale=" .. scale) then
+                vsr_applied_now = true
+                vsr_was_applied = true
+            else
+                mp.msg.warn("Failed to apply @vsr filter (unsupported GPU/driver?)")
+            end
         else
             -- p010/p016 (10-bit HW decode) and other formats land here.
             -- NVIDIA VSR support for 10-bit is inconsistent; skipping to avoid errors.
@@ -161,29 +203,62 @@ local function apply_combined(crop_meta)
         end
     end
 
-    -- Crop rectangle: scale it by the same factor @vsr just applied, so it
-    -- matches the frame video-crop actually gets applied against (the VO
-    -- receives the POST-filter-chain frame, not the raw decoded one).
-    if crop_meta then
-        local f = vsr_applied_now and scale or 1
-        local cw = math.floor(crop_meta.w * f)
-        local ch = math.floor(crop_meta.h * f)
-        local cx = math.floor(crop_meta.x * f)
-        local cy = math.floor(crop_meta.y * f)
-        mp.command(string.format("%s set file-local-options/video-crop %dx%d+%d+%d",
-                                  command_prefix, cw, ch, cx, cy))
+    local function report(cropped)
+        if vsr_applied_now then
+            mp.osd_message("NVIDIA VSR: " .. scale .. "x upscale"
+                .. (cropped and " (cropped)" or ""), 2)
+        end
+    end
+
+    if crop_meta and vsr_applied_now then
+        -- @vsr's filter-graph reconfiguration isn't synchronous with the
+        -- `vf append` call above -- the pipeline is still emitting the
+        -- OLD (pre-upscale) frame size for a beat after we insert the
+        -- filter. Confirmed by testing: setting the scaled video-crop
+        -- immediately here got it validated against the stale size and
+        -- silently discarded by mpv ("Ignoring invalid --video-crop=...
+        -- for 1920x1080 image" while @vsr was scaling to 3840x2160).
+        -- video-out-params reflects dimensions AFTER the filter chain
+        -- runs, so wait for it to actually change before setting the
+        -- crop, instead of guessing a delay.
+        -- Tracked via crop_watcher/timers.crop_confirm (not local-only)
+        -- so clear_all() can cancel both if a new file loads while this
+        -- wait is still pending -- otherwise a stale observer/timer from
+        -- THIS file could fire later against the NEXT file's state,
+        -- setting a wrong crop rectangle or clobbering `applying`.
+        local pre_scale_out_w = mp.get_property_native("video-out-params/w")
+        crop_watcher = function(_, new_w)
+            if not new_w or new_w == pre_scale_out_w then return end
+            unwatch_crop_confirm()
+            kill_timer("crop_confirm")
+            set_scaled_crop(crop_meta, scale)
+            applying = false
+            report(true)
+        end
+        mp.observe_property("video-out-params/w", "native", crop_watcher)
+        -- Fallback in case video-out-params never changes for some reason
+        -- (e.g. the VO doesn't reconfigure as expected) -- don't leave
+        -- the observer or `applying` dangling forever.
+        timers.crop_confirm = mp.add_timeout(2, function()
+            timers.crop_confirm = nil
+            unwatch_crop_confirm()
+            mp.msg.warn("video-out-params never confirmed the @vsr resize; leaving crop unset")
+            applying = false
+            report(false)
+        end)
+    elseif crop_meta then
+        -- No @vsr resize happening, so the frame size isn't changing --
+        -- safe to set the (unscaled) crop immediately.
+        set_scaled_crop(crop_meta, 1)
+        applying = false
+        report(true)
     else
         if mp.get_property("video-crop") ~= "" then
             mp.command(string.format("%s set file-local-options/video-crop ''", command_prefix))
         end
+        applying = false
+        report(false)
     end
-
-    if vsr_applied_now then
-        mp.osd_message("NVIDIA VSR: " .. scale .. "x upscale"
-            .. (crop_meta and " (cropped)" or ""), 2)
-    end
-
-    applying = false
 end
 
 -- Reads cropdetect's vf-metadata, validates it (mirrors mpv core's
@@ -192,13 +267,19 @@ local function finish_detection()
     local metadata = mp.get_property_native("vf-metadata/" .. cropdetect_label)
     remove_cropdetect()
     kill_timer("detect_crop")
-    restore_hwdec()
 
     local raw_width  = mp.get_property_native("width")
     local raw_height = mp.get_property_native("height")
 
+    -- raw_width/raw_height can be nil here if the video track changed or
+    -- disappeared during the ~1s detection window (e.g. the vid observer
+    -- fired mid-detection) -- guard before using them in arithmetic below,
+    -- or a nil-arithmetic error here would abort before apply_combined()
+    -- runs, leaving `applying` stuck true for the rest of the file.
     local crop_meta = nil
-    if metadata and metadata["lavfi.cropdetect.w"] then
+    if not (raw_width and raw_height) then
+        mp.msg.warn("No video dimensions (track changed mid-detection?), skipping crop.")
+    elseif metadata and metadata["lavfi.cropdetect.w"] then
         local w = tonumber(metadata["lavfi.cropdetect.w"])
         local h = tonumber(metadata["lavfi.cropdetect.h"])
         local x = tonumber(metadata["lavfi.cropdetect.x"])
@@ -221,28 +302,22 @@ local function finish_detection()
     apply_combined(crop_meta)
 end
 
--- Inserts the cropdetect filter and starts the detection timer. Mirrors
--- mpv core's autocrop.lua: hwdec is temporarily disabled during detection
--- since the plain cropdetect filter needs software-accessible frame data.
+-- Inserts the cropdetect filter and starts the detection timer. No hwdec
+-- handling needed here -- hwdec=d3d11va-copy (required in mpv.conf) means
+-- every decoded frame already lands in system RAM, which the plain
+-- cropdetect filter can read directly.
 --
 -- Sets `applying` for this function's entire duration through
 -- finish_detection()/apply_combined() (not just the final apply step),
--- since the vf-remove and hwdec-toggle calls in between would otherwise
--- spuriously re-trigger the pixelformat/vf observers mid-flight -- via
--- our own changes, not an external one.
+-- since the vf-remove calls in between would otherwise spuriously
+-- re-trigger the vf observer mid-flight via our own changes, not an
+-- external one.
 local function start_detection()
     applying = true
 
     if not is_cropable(options.detect_seconds) then
         apply_combined(nil)
         return
-    end
-
-    local hwdec_current = mp.get_property("hwdec-current", "no")
-    if hwdec_current:find("-copy$") == nil and hwdec_current ~= "no" and
-       hwdec_current ~= "crystalhd" and hwdec_current ~= "rkmpp" then
-        hwdec_backup = mp.get_property("hwdec")
-        mp.set_property("hwdec", "no")
     end
 
     mp.command(string.format(
@@ -264,11 +339,10 @@ local function begin_evaluation()
 end
 
 -- Routes through the settle delay every time, not just on file-loaded --
--- e.g. the pixelformat observers below fire the moment hwdec/decode
--- format is known, which can be well before hwdec has actually settled.
--- Calling begin_evaluation() directly from those would bypass the delay
--- entirely (the same "evaluated too early" bug this script exists to fix
--- for crop, just via a different trigger).
+-- e.g. the vid observer below could in principle fire close to file-load
+-- time too. Calling begin_evaluation() directly from a trigger like that
+-- would bypass the delay entirely (the same "evaluated too early" bug
+-- this script exists to fix for crop, just via a different trigger).
 local function schedule_evaluation()
     if applying then return end
     kill_timer("settle")
@@ -313,9 +387,9 @@ mp.add_key_binding(nil, "toggle_auto_crop", toggle_auto_crop)
 mp.register_event("file-loaded", on_file_loaded)
 mp.register_event("end-file", clear_all)
 
--- Re-evaluate on format change too (track switch mid-file, hwdec settling)
-mp.observe_property("video-params/pixelformat",    "native", schedule_evaluation)
-mp.observe_property("video-params/hw-pixelformat", "native", schedule_evaluation)
+-- Re-evaluate on video track switch mid-file (a different track can have
+-- a different resolution).
+mp.observe_property("vid", "native", schedule_evaluation)
 
 -- Re-apply if vf chain is externally cleared (e.g. user runs 'vf clr')
 -- but NOT when we're the ones changing it, and NOT on videos where VSR
