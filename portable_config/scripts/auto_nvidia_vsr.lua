@@ -62,7 +62,31 @@ local function schedule_vsr()
     end)
 end
 
--- Trigger on format change (file load, track switch)
+-- Strip a leftover @vsr filter immediately (not after the 3s delay), so a
+-- new file isn't briefly shown through a filter scaled for the previous
+-- one. Guarded with `applying` so the vf observer below doesn't re-enter.
+local function clear_vsr()
+    applying = true
+    local vf_current = mp.get_property("vf") or ""
+    if vf_current:find("@vsr") then
+        mp.command("vf remove @vsr")
+    end
+    vsr_was_applied = false
+    applying = false
+end
+
+-- file-loaded is the authoritative per-file trigger: it fires on every
+-- file regardless of whether the pixel-format string happens to differ
+-- from the previous file (e.g. two back-to-back NV12 files at different
+-- resolutions wouldn't otherwise change video-params/pixelformat at all).
+local function on_file_loaded()
+    clear_vsr()
+    schedule_vsr()
+end
+
+mp.register_event("file-loaded", on_file_loaded)
+
+-- Trigger on format change too (track switch mid-file, hwdec settling)
 mp.observe_property("video-params/pixelformat",    "native", schedule_vsr)
 mp.observe_property("video-params/hw-pixelformat", "native", schedule_vsr)
 
