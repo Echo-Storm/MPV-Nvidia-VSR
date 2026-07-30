@@ -60,12 +60,16 @@ MPV/
     │   ├── screenshotfolder_echostorm.lua← organized screenshots (Echostorm)
     │   ├── thumbfast.lua                 ← seekbar thumbnails
     │   ├── pause_indicator_lite.lua      ← pause overlay
-    │   └── playlistmanager.lua           ← playlist OSD
+    │   ├── playlistmanager.lua           ← playlist OSD
+    │   ├── open_file.lua                 ← native Windows open file/subtitle/audio dialog
+    │   └── ytdlautoformat.lua            ← auto ytdl-format per domain (YouTube, Twitch, Kick)
     ├── script-opts/
     │   ├── modernz.conf
     │   ├── thumbfast.conf
     │   ├── pause_indicator_lite.conf
-    │   └── playlistmanager.conf
+    │   ├── playlistmanager.conf
+    │   ├── ytdlautoformat.conf
+    │   └── ytdl_hook.conf                ← pins ytdl_path to yt-dlp
     └── shaders/
         └── cache/
 ```
@@ -83,6 +87,8 @@ MPV/
 - **Audio normalization:** `dynaudnorm` available via `af=` in `mpv.conf` (commented out by default — uncomment to enable)
 - **Network buffering:** Cache and readahead configured for HLS/live stream stability
 - **UI:** Borders enabled, windowed by default, taskbar progress enabled
+- **File dialogs:** `Ctrl+O` opens files, `Ctrl+Shift+S` adds a subtitle, `Ctrl+Shift+A` adds an audio track — all via the native Windows file picker
+- **Stream quality:** `ytdl-format` auto-adjusts for YouTube, Twitch, and Kick (720p cap by default), leaving other sites on `mpv.conf`'s default — pairs well with RTX VSR upscaling lower-res source
 
 ---
 
@@ -99,6 +105,24 @@ MPV/
 ## 📋 Changelog
 
 ### 2026-07-29 — v1.0.0: Full Script Sync & Bug Fix
+
+### 2026-07-29 — v1.0.2: File Dialogs & Auto Stream Quality
+
+**New — open_file.lua (from ModernZ extras):**
+- Native Windows file dialog for opening files (`Ctrl+O`), adding a subtitle (`Ctrl+Shift+S`), or adding an audio track (`Ctrl+Shift+A`)
+- Keybinds added to `input.conf`
+
+**New — ytdlautoformat.lua (Samillion/mpv-ytdlautoformat):**
+- Auto-adjusts `ytdl-format` per domain instead of a single fixed setting in `mpv.conf`
+- `ytdlautoformat.conf` domains: `youtu.be, youtube.com, twitch.tv, kick.com` (Kick added), quality capped at 720p by default, fallback enabled
+- Other domains are untouched and fall back to whatever `ytdl-format` (if any) is set in `mpv.conf`
+
+**New — ytdl_hook.conf:**
+- Pins `ytdl_path=yt-dlp` explicitly, since the installer bundles `yt-dlp.exe` (not `youtube-dl`)
+
+### 2026-07-29 — v1.0.1: VSR Filter Fix
+
+- See commit history — fixed a stale `@vsr` filter lingering across file switches and a missed re-evaluation when consecutive files share a pixel format but differ in resolution. 3-second hwdec settle delay unchanged.
 
 **Bug fix — 1_Full_Latest_MPV_Installer.ps1:**
 - Removed unconditional admin elevation. The script only downloads/extracts into its own portable folder and writes marker files — never needs admin — but was always triggering a UAC prompt anyway, contradicting the README's "no admin required" claim.
