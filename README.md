@@ -66,7 +66,8 @@ MPV/
     │   ├── ytdlautoformat.lua            ← auto ytdl-format per domain (YouTube, Twitch, Kick)
     │   ├── chapterskip.lua               ← auto-skip OP/ED/preview chapters
     │   ├── reload.lua                    ← auto-reload stalled streams
-    │   ├── hdr-mode.lua                  ← SDR/HDR auto-switch (inert until mpv-display-plugin is installed)
+    │   ├── hdr-mode.lua                  ← SDR/HDR auto-switch
+    │   ├── display-info.dll              ← mpv-display-plugin, HDR display info for hdr-mode.lua
     │   └── autochapters/main.lua         ← auto-detect anime OP/ED chapters (needs guessit.exe, see below)
     ├── script-opts/
     │   ├── modernz.conf
@@ -102,9 +103,9 @@ MPV/
 - **Stream quality:** `ytdl-format` auto-adjusts for YouTube, Twitch, and Kick (720p cap by default), leaving other sites on `mpv.conf`'s default — pairs well with RTX VSR upscaling lower-res source
 - **Auto-crop:** black bars auto-detected and cropped as part of the same evaluation that decides VSR's scale factor (`vsr_autocrop.lua`, see Changelog for why these can't be separate scripts). `c` toggles/undoes the current crop+VSR state manually (`C`, uppercase, is taken by the aspect-ratio cycle); auto-crop mode itself can be toggled from the right-click `&Video` menu
 - **Chapter skip:** opening, ending, and next-episode preview chapters auto-skipped when present — toggle from the right-click `&Chapters` menu
-- **Auto chapters:** missing OP/ED chapters looked up automatically for anime files (requires `guessit.exe`, installed automatically by script 1; and `curl`, built into Windows 10/11) — manual search/database-update also in the right-click `&Chapters` menu
+- **Auto chapters:** missing OP/ED chapters looked up automatically for anime files (requires `guessit.exe`, installed automatically by script 1 — or downloaded manually from [guessit-io/guessit releases](https://github.com/guessit-io/guessit/releases) and dropped in the install root; and `curl`, built into Windows 10/11) — manual search/database-update also in the right-click `&Chapters` menu
 - **Stream auto-reload:** a stalled/dead network stream automatically reloads from its last position (`Ctrl+R` to trigger manually, also in the right-click Playback menu)
-- **HDR auto-switch:** wired in but inert by default — needs [mpv-display-plugin](https://github.com/dyphire/mpv-display-plugin) installed separately. Cycle `noth`/`switch`/`pass` from the right-click `&Window` menu once that's installed
+- **HDR:** [mpv-display-plugin](https://github.com/dyphire/mpv-display-plugin) (`scripts/display-info.dll`) provides display HDR capability info to `hdr-mode.lua`. Defaults to `hdr_mode=pass` (passes HDR through when the display is already in HDR mode; no automatic OS-level HDR switching, no flicker risk). Cycle `noth`/`switch`/`pass` from the right-click `&Window` menu
 
 ---
 
@@ -119,6 +120,14 @@ MPV/
 ---
 
 ## 📋 Changelog
+
+### 2026-07-30 — v1.0.10: guessit.exe and mpv-display-plugin Actually Installed
+
+Both `autochapters` and `hdr-mode.lua` were wired in but had their real dependencies missing until now:
+
+- **`guessit.exe`** (v4.1.0) downloaded and placed in the install root alongside `mpv.exe`/`ffmpeg.exe`/`yt-dlp.exe`/`.guessit_last_version.txt`, matching the existing yt-dlp bundling pattern exactly — a runtime binary, not tracked in git. `autochapters` can now actually parse filenames.
+- **`display-info.dll`** ([dyphire/mpv-display-plugin](https://github.com/dyphire/mpv-display-plugin) v1.1.0) installed to `scripts/` — this one *is* tracked in git, same as the Lua scripts, since it's a small stable plugin rather than a versioned auto-updated external tool. Confirmed its exposed `user-data/display-info/*` properties (`hdr-supported`, `hdr-status`, `max-luminance`, `min-luminance`) match exactly what `hdr-mode.lua` reads.
+- `hdr-mode.conf`: `hdr_mode` changed from `noth` to `pass` — passes HDR through when the display is already in HDR mode, no automatic OS-level HDR switching (and so no flicker risk from that). `switch` (fully automatic, but can cause a brief blank/flicker on some monitors when the OS-level HDR mode toggles) is available via the right-click `&Window` menu if wanted instead.
 
 ### 2026-07-30 — v1.0.9: Pre-Existing mpv.conf/Font Bugs
 
