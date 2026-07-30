@@ -5,7 +5,7 @@
 This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) enabled in the Nvidia Control Panel. It includes:
 
 - A streamlined `mpv.conf` optimized for modern GPUs
-- A custom Lua script that triggers VSR after 3 seconds of playback and upscales to native resolution
+- A custom Lua script that triggers VSR after 3 seconds of playback, auto-crops black bars, and upscales to native resolution — the two are integrated in one script so crop coordinates and VSR's scale factor never disagree (see Changelog)
 - Font and UI tweaks for a clean, modern look via ModernZ v0.3.3
 - Fully portable structure with optional system integration
 - Built-in `select.lua` UI for interactive playlist, audio, subtitle, and chapter selection
@@ -57,14 +57,13 @@ MPV/
     ├── fonts/               ← Netflix Sans + ModernZ icon fonts
     ├── scripts/
     │   ├── modernz.lua                   ← OSC UI
-    │   ├── auto_nvidia_vsr.lua           ← RTX VSR upscaler (Echostorm)
+    │   ├── vsr_autocrop.lua              ← RTX VSR upscaler + crop-aware auto-crop, one integrated script (Echostorm)
     │   ├── screenshotfolder_echostorm.lua← organized screenshots (Echostorm)
     │   ├── thumbfast.lua                 ← seekbar thumbnails
     │   ├── pause_indicator_lite.lua      ← pause overlay
     │   ├── playlistmanager.lua           ← playlist OSD
     │   ├── open_file.lua                 ← native Windows open file/folder/subtitle/audio dialog (Echostorm: added open folder)
     │   ├── ytdlautoformat.lua            ← auto ytdl-format per domain (YouTube, Twitch, Kick)
-    │   ├── autocrop.lua                  ← auto-crop black bars (mpv core script)
     │   ├── chapterskip.lua               ← auto-skip OP/ED/preview chapters
     │   ├── reload.lua                    ← auto-reload stalled streams
     │   ├── hdr-mode.lua                  ← SDR/HDR auto-switch (inert until mpv-display-plugin is installed)
@@ -76,7 +75,7 @@ MPV/
     │   ├── playlistmanager.conf
     │   ├── ytdlautoformat.conf
     │   ├── ytdl_hook.conf                ← pins ytdl_path to yt-dlp
-    │   ├── autocrop.conf
+    │   ├── vsr_autocrop.conf
     │   ├── chapterskip.conf
     │   ├── reload.conf
     │   ├── hdr-mode.conf
@@ -91,7 +90,7 @@ MPV/
 
 - **Base UI:** ModernZ v0.3.3 with fluent icon theme
 - **Fonts:** Netflix Sans Medium (default), with Light and Bold variants
-- **Upscaling:** RTX VSR script activates after 3 seconds, auto-upscales to native resolution — only applies when video is below display resolution and hardware decoded
+- **Upscaling:** RTX VSR activates ~4 seconds after playback starts (3s hwdec settle + 1s crop detection), auto-upscales to native resolution — only applies when the *cropped* video content is below display resolution and hardware decoded (`vsr_autocrop.lua`)
 - **Interactive menus:** Built-in `select.lua` (mpv 0.40+) wired to playlist, audio track, subtitle, chapter, and audio device buttons
 - **Thumbnails:** thumbfast enabled including network/stream sources
 - **Screenshots:** Auto-organized into `Desktop/mpv/screenshots/{title}/`, timestamped, JPG
@@ -99,9 +98,9 @@ MPV/
 - **Network buffering:** Cache and readahead configured for HLS/live stream stability
 - **UI:** Borders enabled, windowed by default, taskbar progress enabled
 - **File dialogs:** `Ctrl+O` opens files, `Ctrl+Shift+O` opens a folder, `Ctrl+Shift+S` adds a subtitle, `Ctrl+Shift+A` adds an audio track — all via native Windows dialogs, also reachable from the right-click menu
-- **Right-click menu:** mpv's full default context menu (`menu.conf`) — playback, tracks, video/audio/subtitle controls, window, tools, etc. — plus Open File/Folder/Subtitle/Audio at the top of the Open submenu, and runtime toggles for autocrop, auto-crop mode, chapter-skip, and HDR mode (see below)
+- **Right-click menu:** mpv's full default context menu (`menu.conf`) — playback, tracks, video/audio/subtitle controls, window, tools, etc. — plus Open File/Folder/Subtitle/Audio at the top of the Open submenu, and runtime toggles for crop, auto-crop mode, chapter-skip, and HDR mode (see below)
 - **Stream quality:** `ytdl-format` auto-adjusts for YouTube, Twitch, and Kick (720p cap by default), leaving other sites on `mpv.conf`'s default — pairs well with RTX VSR upscaling lower-res source
-- **Auto-crop:** black bars auto-detected and cropped ~2 seconds into playback (tuned to land before VSR's own trigger, see Changelog). `c` toggles/undoes the current crop manually (`C`, uppercase, is taken by the aspect-ratio cycle); auto-crop mode itself can be toggled from the right-click `&Video` menu
+- **Auto-crop:** black bars auto-detected and cropped as part of the same evaluation that decides VSR's scale factor (`vsr_autocrop.lua`, see Changelog for why these can't be separate scripts). `c` toggles/undoes the current crop+VSR state manually (`C`, uppercase, is taken by the aspect-ratio cycle); auto-crop mode itself can be toggled from the right-click `&Video` menu
 - **Chapter skip:** opening, ending, and next-episode preview chapters auto-skipped when present — toggle from the right-click `&Chapters` menu
 - **Auto chapters:** missing OP/ED chapters looked up automatically for anime files (requires `guessit.exe`, installed automatically by script 1; and `curl`, built into Windows 10/11) — manual search/database-update also in the right-click `&Chapters` menu
 - **Stream auto-reload:** a stalled/dead network stream automatically reloads from its last position (`Ctrl+R` to trigger manually, also in the right-click Playback menu)
@@ -120,6 +119,26 @@ MPV/
 ---
 
 ## 📋 Changelog
+
+### 2026-07-29 — v1.0.7: autocrop.lua Removed, Merged Into vsr_autocrop.lua
+
+Real-world testing on `D:\Applications\MPV` showed VSR's scaling was "all messed up" whenever autocrop was active, regardless of how the timing between the two scripts was tuned (v1.0.4's crop-aware re-evaluation, v1.0.5's `auto_delay` tuning, and reverting to `auto_delay=4` for testing all failed the same way). The root cause turned out to have nothing to do with timing:
+
+**Root cause:** `video-crop` is applied by the VO *after* the entire `vf` chain runs (confirmed against mpv's own source, `player/video.c`'s `apply_video_crop()`). `autocrop.lua`'s cropdetect measures the crop rectangle against the **raw decoded frame**. But once `@vsr` has already upscaled that frame by the time `video-crop` reaches the VO, the crop rectangle is being applied in the wrong coordinate space entirely — not "slightly off", just wrong. No amount of retiming two independently-triggered scripts fixes a coordinate-space mismatch.
+
+**Fix:** `autocrop.lua` and `autocrop.conf` are removed. Crop detection is folded directly into a new `vsr_autocrop.lua` (replacing `auto_nvidia_vsr.lua`), which now owns the whole flow as one coordinated step:
+
+1. Wait `settle_delay` (3s, hwdec settle — unchanged, still load-bearing)
+2. Run cropdetect for `detect_seconds` (1s)
+3. Compute VSR's scale factor from the **cropped** content size vs. display size
+4. Apply `@vsr` at that scale
+5. Set `video-crop` using the detected rectangle **scaled by that same VSR factor**, so it lines up with the frame `@vsr` actually outputs — not the raw decoded one
+
+- `settle_delay`/`detect_seconds`/`detect_limit`/`detect_round`/`detect_min_ratio`/`suppress_osd` all carried over as options in the new `vsr_autocrop.conf`; `auto_crop` replaces `autocrop.conf`'s old `auto` option
+- Manual toggle key `c` and the `C`-collision comment carried over unchanged (input.conf)
+- `menu.conf`, previously pointing at `autocrop/toggle_crop` and `autocrop/toggle_auto`, now points at `vsr_autocrop/toggle_crop` and `vsr_autocrop/toggle_auto_crop`
+- Fixed a bug caught during review before release: the pixelformat-change observers (for mid-file track switches) called the evaluation function directly with no delay, bypassing `settle_delay` entirely for that trigger path — same class of "evaluated before hwdec settled" bug this whole rework exists to fix, just via a different trigger. Now routed through the same delayed scheduler as file-loaded.
+- `applying` guard now covers the entire detect→apply flow (previously only the final apply step), since the script's own `vf remove`/hwdec-toggle calls during cropdetect could otherwise spuriously re-trigger its own observers mid-flight
 
 ### 2026-07-29 — v1.0.6: Context Menu Toggles
 
