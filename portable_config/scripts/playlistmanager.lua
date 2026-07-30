@@ -1076,6 +1076,10 @@ function playfile()
   if cursor ~= pos or is_idle then
     write_watch_later()
     mp.set_property("playlist-pos", cursor)
+    if (mp.get_property_native('pause')) then     -- TK resume playback on playlist file selection
+      mp.set_property_native("pause",false)
+      msg.info("Pause cycled")
+    end
   else
     if cursor~=plen-1 then
       cursor = cursor + 1

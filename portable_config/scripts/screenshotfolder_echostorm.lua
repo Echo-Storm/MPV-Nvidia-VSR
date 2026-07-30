@@ -50,11 +50,16 @@ end
 -- Called on file load. Uses file-loaded (not start-file) so that media-title,
 -- path, and filename are guaranteed to be populated before we read them.
 local function init()
-    local name  = mp.get_property("filename/no-ext") or ""
-    local media = mp.get_property("media-title") or name
+    local filename = mp.get_property("filename") or ""
+    local name      = mp.get_property("filename/no-ext") or filename
+    local media     = mp.get_property("media-title") or name
 
-    if media:match("^[%w]+://") and options.include_YouTube_ID then
-        local vid = mp.get_property("filename"):match("[?&]v=([^&]+)")
+    -- Check the source filename/URL for the network scheme, not media-title:
+    -- media-title is already resolved to the human-readable video title by
+    -- the time file-loaded fires (e.g. via ytdl_hook), so it never matches
+    -- a URL pattern and this branch would otherwise never trigger.
+    if options.include_YouTube_ID and filename:match("^[%w]+://") then
+        local vid = filename:match("[?&]v=([^&]+)")
         if vid then media = media .. " [" .. vid .. "]" end
     end
     title = media

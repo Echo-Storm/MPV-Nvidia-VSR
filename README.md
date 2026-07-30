@@ -6,7 +6,7 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
 
 - A streamlined `mpv.conf` optimized for modern GPUs
 - A custom Lua script that triggers VSR after 3 seconds of playback and upscales to native resolution
-- Font and UI tweaks for a clean, modern look via ModernZ v0.3.0
+- Font and UI tweaks for a clean, modern look via ModernZ v0.3.3
 - Fully portable structure with optional system integration
 - Built-in `select.lua` UI for interactive playlist, audio, subtitle, and chapter selection
 
@@ -27,7 +27,7 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
 
 ### 🔄 To uninstall:
 
-- **Run `X2_Remove_Supported_File_types_From_Open_With.ps1`**
+- **Run `X1_Remove_Supported_File_types_From_Open_With.ps1`**
   - Removes PATH entry, Open With registration, and filetype associations
 
 ### 🔁 To update:
@@ -36,8 +36,6 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
 - Updates MPV, FFmpeg, and yt-dlp
 - No need to re-run registration scripts unless you've uninstalled
 
-> **Note:** Scripts 2 and X1 are legacy versions superseded by 3 and X2 respectively. Use 3 and X2.
-
 ---
 
 ## 📁 Folder Structure
@@ -45,10 +43,8 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
 ```
 MPV/
 ├── 1_Full_Latest_MPV_Installer.ps1
-├── 2_Register_MPV_SANELY_Add_PATH.ps1          ← legacy, use 3 instead
-├── 3_Add_Supported_Filetypes_To_Open_With.ps1  ← use this for registration
-├── X1_Unregister_MPV_SANELY_REMOVE_PATH.ps1    ← legacy, use X2 instead
-├── X2_Remove_Supported_File_types_From_Open_With.ps1  ← use this to uninstall
+├── 2_Add_Supported_Filetypes_To_Open_With.ps1          ← registration (PATH + Open With)
+├── X1_Remove_Supported_File_types_From_Open_With.ps1   ← uninstall (reverses script 2)
 ├── doc/
 │   ├── manual.pdf
 │   └── mpbindings.png
@@ -78,13 +74,13 @@ MPV/
 
 ## 🎯 Features
 
-- **Base UI:** ModernZ v0.3.0 with fluent icon theme
+- **Base UI:** ModernZ v0.3.3 with fluent icon theme
 - **Fonts:** Netflix Sans Medium (default), with Light and Bold variants
 - **Upscaling:** RTX VSR script activates after 3 seconds, auto-upscales to native resolution — only applies when video is below display resolution and hardware decoded
 - **Interactive menus:** Built-in `select.lua` (mpv 0.40+) wired to playlist, audio track, subtitle, chapter, and audio device buttons
 - **Thumbnails:** thumbfast enabled including network/stream sources
 - **Screenshots:** Auto-organized into `Desktop/mpv/screenshots/{title}/`, timestamped, JPG
-- **Audio normalization:** Dynamic loudness normalization active for Season 5 (temporary — see changelog)
+- **Audio normalization:** `dynaudnorm` available via `af=` in `mpv.conf` (commented out by default — uncomment to enable)
 - **Network buffering:** Cache and readahead configured for HLS/live stream stability
 - **UI:** Borders enabled, windowed by default, taskbar progress enabled
 
@@ -101,6 +97,40 @@ MPV/
 ---
 
 ## 📋 Changelog
+
+### 2026-07-29 — v1.0.0: Full Script Sync & Bug Fix
+
+**Bug fix — 1_Full_Latest_MPV_Installer.ps1:**
+- Removed unconditional admin elevation. The script only downloads/extracts into its own portable folder and writes marker files — never needs admin — but was always triggering a UAC prompt anyway, contradicting the README's "no admin required" claim.
+
+**Bug fix — screenshotfolder_echostorm.lua:**
+- Fixed `include_YouTube_ID` never triggering. The code checked whether the *resolved* `media-title` looked like a URL, but `media-title` is already resolved to the human-readable video title (via `ytdl_hook`) by the time `file-loaded` fires, so it never matches a URL pattern. Now checks the actual source `filename` instead, so the video ID is correctly appended to the screenshot folder name for YouTube playback.
+
+**modernz.lua / modernz.conf — updated to v0.3.3 (from v0.3.2):**
+- Replaced `modernz.lua` wholesale with upstream v0.3.3
+- Changed `layout=modern` → `layout=default` (layout values renamed: `modern`/`modern-compact` → `default`/`compact`/`mini`/`seekbar`; new `mini` and `seekbar` layouts also available)
+- Removed `chapter_softrepeat` — option no longer exists upstream
+- New option: `truncate_title=no` — ellipsis for overflowing titles
+- New option: `ab_loop_color=#2596be` — color of the new A/B loop seekbar indicator
+- New option: `thumbnail_box_outline_size=1` — thumbnail box border thickness
+- New options: `seekbar_wheel_up_command=seek 10` / `seekbar_wheel_down_command=seek -10` — new seekbar wheel actions
+- All existing customized values (colors, button toggles, sizes, mouse bindings, `seekbarkeyframes=no`, `hover_effect=size,glow,color`) preserved as-is
+
+**pause_indicator_lite.lua / pause_indicator_lite.conf — synced with upstream ModernZ extras:**
+- Replaced `pause_indicator_lite.lua` wholesale with latest upstream version (rewritten internals: per-file observer lifecycle, indicator position support, themed icon names keyed off `modernz-icons.ttf`)
+- New option: `indicator_pos=middle_center` — indicator position (previously hardcoded to center)
+- New option: `theme_style=outline` — themed icon style (`outline` or `filled`)
+- New option: `mute_icon_size=35` — mute icon size, now vector-drawn instead of font-glyph only
+- All existing customized values (`keybind_allow=yes`, `keybind_set=mbtn_left`, icon sizes/colors) preserved as-is
+
+**thumbfast.lua:** updated wholesale to latest upstream (po5/thumbfast) — no local customizations, config values in `thumbfast.conf` unaffected
+
+**playlistmanager.lua:** updated wholesale to latest upstream (jonniek/mpv-playlistmanager) — no local customizations, config values in `playlistmanager.conf` unaffected
+
+**README:**
+- Corrected stale claim that Season 5 audio normalization was "active" — the `af=` line in `mpv.conf` is commented out by default
+- Fixed uninstall instructions pointing to `X2_Remove_Supported_File_types_From_Open_With.ps1`, a file that doesn't exist in this repo — corrected to the actual `X1_Remove_Supported_File_types_From_Open_With.ps1`
+- Removed stale Folder Structure entries and a "Note" referencing phantom renamed scripts (`3_Add_Supported...`, `X1_Unregister_MPV_SANELY...`) that were never added to the repo
 
 ### 2026-03-17 — Audit & Modernz 0.3.0 Update
 

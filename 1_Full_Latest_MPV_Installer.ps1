@@ -27,21 +27,10 @@ $ghHeaders = @{
 }
 
 # -----------------------------
-# Elevation & Directory Setup
+# Directory Setup
 # -----------------------------
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
-    Write-Host "Not running as admin → requesting elevation..." -ForegroundColor Yellow
-    Start-Process powershell.exe -Verb RunAs -ArgumentList @(
-        "-NoProfile",
-        "-ExecutionPolicy", "Bypass",
-        "-File", "`"$PSCommandPath`""
-    )
-    exit
-}
-
-Write-Host "Running elevated as admin." -ForegroundColor Green
-
-# Use PSScriptRoot (critical after elevation!)
+# No elevation here: this script only downloads/extracts into its own
+# portable folder and writes marker files, which never requires admin.
 $installDir = $PSScriptRoot
 if (-not $installDir) {
     $installDir = Get-Location
