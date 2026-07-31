@@ -2,6 +2,10 @@
 
 All notable changes to this repo, newest first. See [README.md](README.md) for current features and setup.
 
+### 2026-07-30 — v1.0.16: Configuration Manager Screenshot
+
+- **`doc/configuration_manager.png`** added and wired into the README's install instructions, so the panel has a visual instead of just a description.
+
 ### 2026-07-30 — v1.0.15: Configuration Manager
 
 - **New — `3_Configuration_Manager.ps1`**: a standalone PowerShell+WPF checkbox/dropdown/text panel for the settings worth flipping without opening a config file by hand — audio/subtitle language priority, interpolation, debanding, auto-crop, RTX Video HDR, HDR display mode, surround audio preference, the two opt-in audio fixes (audio-stream-silence, dynaudnorm), chapter auto-skip, stream thumbnails, max stream quality cap, and the three stream auto-reload triggers. Edits only the specific line each changed setting owns — every comment and every other setting in `mpv.conf`/`script-opts/*.conf` is preserved untouched, verified by diffing a full round-trip against the real files (flip every setting, write, diff against originals: exactly one changed line per touched setting, zero collateral changes). Guards against a same-named key inside an mpv.conf profile block (e.g. `[WEB-DL]`'s own `deband=yes`) ever being mistaken for the global setting, by stopping the line search at the first `[section]` header. No admin required; changes take effect the next time mpv starts, since it edits the files mpv reads at launch rather than talking to a running instance. Renders in light mode regardless of system theme (plain WPF window, doesn't auto-theme on Windows 11 the way the native file-open dialog does).
