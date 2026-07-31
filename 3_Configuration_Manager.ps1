@@ -115,6 +115,8 @@ $settings = @(
        Tooltip = "Optional SDR->HDR enhancement (mpv 0.40+, requires RTX Video HDR enabled in the NVIDIA app). Only ever applies when the display is confirmed already in HDR mode -- otherwise a no-op." }
     @{ Group = "Video"; Label = "HDR display mode"; File = $hdrConf; Kind = "Enum"; Key = "hdr_mode"; Options = @("noth", "pass", "switch")
        Tooltip = "noth = do nothing. pass = pass HDR through when the display is already in HDR mode (no flicker risk). switch = auto-switch the display between HDR/SDR based on content (can flicker on some monitors)." }
+    @{ Group = "Video"; Label = "Video sync"; File = $mpvConf; Kind = "Enum"; Key = "video-sync"; Options = @("display-resample", "audio")
+       Tooltip = "display-resample resamples audio to match display refresh for smoother motion. Switch to audio for live/HLS streams -- display-resample can cause issues there." }
 
     @{ Group = "Audio"; Label = "Prefer surround audio track"; File = $surroundConf; Kind = "Bool"; Key = "enabled"
        Tooltip = "On file load, auto-selects whichever audio track reports the highest channel count -- but only among tracks matching mpv's own language selection, never overriding it just for more channels." }
@@ -130,6 +132,8 @@ $settings = @(
 
     @{ Group = "Streaming"; Label = "Thumbnails on network streams"; File = $thumbConf; Kind = "Bool"; Key = "network"
        Tooltip = "Generates seekbar thumbnail previews for network/stream sources, not just local files." }
+    @{ Group = "Streaming"; Label = "Stream cache size"; File = $mpvConf; Kind = "Text"; Key = "demuxer-max-bytes"
+       Tooltip = "Maximum demuxer cache size (e.g. 50MiB). Larger absorbs longer stalls on HLS/live streams at the cost of more RAM; smaller reduces memory use but tolerates less network hiccup before stalling." }
     @{ Group = "Streaming"; Label = "Max stream quality cap"; File = $ytdlConf; Kind = "Enum"; Key = "quality"; Options = @("0", "240", "360", "480", "720", "1080", "1440", "2160", "4320")
        Tooltip = "Caps ytdl-format's requested quality for YouTube/Twitch/Kick at load time (0 = no cap/best available). Can still be bumped up/down mid-stream from the right-click Playback menu." }
     @{ Group = "Streaming"; Label = "Auto-reload on paused/stalled cache"; File = $reloadConf; Kind = "Bool"; Key = "paused_for_cache_timer_enabled"

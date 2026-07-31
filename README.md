@@ -55,7 +55,7 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
 ### 🛠️ To change settings without hand-editing config files:
 
 - **Run `3_Configuration_Manager.ps1`**
-  - A small checkbox/dropdown/text panel for the settings you're most likely to actually flip — audio/subtitle language priority, interpolation, debanding, auto-crop, RTX Video HDR, HDR display mode, surround audio preference, the two opt-in audio fixes, chapter auto-skip, stream thumbnails, max stream quality, and the stream auto-reload triggers
+  - A small checkbox/dropdown/text panel for the settings you're most likely to actually flip — audio/subtitle language priority, interpolation, debanding, auto-crop, RTX Video HDR, HDR display mode, video sync, surround audio preference, the two opt-in audio fixes, chapter auto-skip, stream thumbnails, stream cache size, max stream quality, and the stream auto-reload triggers
   - Reads and rewrites only the specific lines it changes — every comment and every other setting in `mpv.conf`/`script-opts/*.conf` is left exactly where it was
   - No admin required. Changes take effect the next time mpv starts (this edits the files mpv reads at launch, it doesn't talk to a running mpv instance)
   - Renders in light mode regardless of system theme — it's a plain WPF window, which (unlike the native file-open dialog) doesn't auto-theme on Windows 11
@@ -186,7 +186,10 @@ MPV/
 
 Full version history moved to [CHANGELOG.md](CHANGELOG.md).
 
-### 2026-07-31 — v1.0.18: Header Banner, 2x2 Screenshot Grid, Cropped Screenshots
+### 2026-07-31 — v1.0.19: Remove Verbose Logging, Video Sync + Stream Cache in Configuration Manager
+
+- **Removed `log-file=~~/mpv.log`** from `mpv.conf`. This was added for active testing and forced mpv's own logging up to at least `-v -v` (mpv's documented behavior whenever `log-file` is set) — the direct cause of the 1.3MB single-session log examined earlier. Flagged in its own comment as temporary since it was added; now actually removed.
+- **New Configuration Manager settings**: `video-sync` (display-resample/audio) and stream cache size (`demuxer-max-bytes`, e.g. `50MiB`) — both previously only editable by hand in `mpv.conf`.
 
 - **New `doc/header.svg`** — a banner at the top of the README (play-icon mark, title, tagline, and RTX VSR/HDR/Portable/No Admin Required tags), colored to match ModernZ's actual accent orange (`#FF8232`, the same value as `seekbarfg_color` in `modernz.conf`) rather than an arbitrary palette.
 - **Screenshots section reworked into a 2x2 grid** (HTML table, since GitHub-flavored markdown has no native side-by-side image layout) with captions, instead of four images stacked vertically.

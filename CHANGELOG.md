@@ -2,6 +2,11 @@
 
 All notable changes to this repo, newest first. See [README.md](README.md) for current features and setup.
 
+### 2026-07-31 — v1.0.19: Remove Verbose Logging, Video Sync + Stream Cache in Configuration Manager
+
+- **Removed `log-file=~~/mpv.log`** from `mpv.conf`. This was added for active testing and forced mpv's own logging up to at least `-v -v` (mpv's documented behavior whenever `log-file` is set) — the direct cause of the 1.3MB single-session log examined earlier. Flagged in its own comment as temporary since it was added; now actually removed.
+- **New Configuration Manager settings**: `video-sync` (display-resample/audio) and stream cache size (`demuxer-max-bytes`, e.g. `50MiB`) — both previously only editable by hand in `mpv.conf`.
+
 ### 2026-07-31 — v1.0.18: Header Banner, 2x2 Screenshot Grid, Cropped Screenshots
 
 - **New `doc/header.svg`** — a banner at the top of the README (play-icon mark, title, tagline, and RTX VSR/HDR/Portable/No Admin Required tags), colored to match ModernZ's actual accent orange (`#FF8232`, the same value as `seekbarfg_color` in `modernz.conf`) rather than an arbitrary palette.
