@@ -2,6 +2,10 @@
 
 All notable changes to this repo, newest first. See [README.md](README.md) for current features and setup.
 
+### 2026-07-31 — v1.0.17: Player/Menu Screenshots
+
+- **New `📸 Screenshots` section** in the README: the player with the ModernZ OSC, the right-click menu, the Open submenu (native file/folder/URL dialogs), and the Tools submenu (Clip export, hardware decoding toggle). Screenshots taken directly against a live mpv instance rather than mocked up.
+
 ### 2026-07-30 — v1.0.16: Configuration Manager Screenshot
 
 - **`doc/configuration_manager.png`** added and wired into the README's install instructions, so the panel has a visual instead of just a description.

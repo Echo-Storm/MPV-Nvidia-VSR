@@ -12,6 +12,26 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
 
 ---
 
+## 📸 Screenshots
+
+**Player (ModernZ OSC)**
+
+![mpv player](doc/mpv_player_osc.jpg)
+
+**Right-click menu**
+
+![Right-click menu](doc/mpv_rightclick_menu.jpg)
+
+**Open submenu** — native file/folder/URL dialogs
+
+![Open submenu](doc/mpv_open_submenu.jpg)
+
+**Tools submenu** — clip export, hardware decoding toggle, and more
+
+![Tools submenu](doc/mpv_tools_clipexport_submenu.jpg)
+
+---
+
 ## ⚙️ Installation & Usage
 
 ### ✅ To install:
@@ -159,6 +179,6 @@ MPV/
 
 Full version history moved to [CHANGELOG.md](CHANGELOG.md).
 
-### 2026-07-30 — v1.0.16: Configuration Manager Screenshot
+### 2026-07-31 — v1.0.17: Player/Menu Screenshots
 
-- **`doc/configuration_manager.png`** added and wired into the README's install instructions, so the panel has a visual instead of just a description.
+- **New `📸 Screenshots` section** in the README: the player with the ModernZ OSC, the right-click menu, the Open submenu (native file/folder/URL dialogs), and the Tools submenu (Clip export, hardware decoding toggle). Screenshots taken directly against a live mpv instance rather than mocked up.
