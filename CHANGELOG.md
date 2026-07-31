@@ -2,6 +2,12 @@
 
 All notable changes to this repo, newest first. See [README.md](README.md) for current features and setup.
 
+### 2026-07-31 — v1.0.18: Header Banner, 2x2 Screenshot Grid, Cropped Screenshots
+
+- **New `doc/header.svg`** — a banner at the top of the README (play-icon mark, title, tagline, and RTX VSR/HDR/Portable/No Admin Required tags), colored to match ModernZ's actual accent orange (`#FF8232`, the same value as `seekbarfg_color` in `modernz.conf`) rather than an arbitrary palette.
+- **Screenshots section reworked into a 2x2 grid** (HTML table, since GitHub-flavored markdown has no native side-by-side image layout) with captions, instead of four images stacked vertically.
+- **All four screenshots re-cropped** to the mpv window itself — removed the desktop icons visible down the left edge and the taskbar along the bottom, both artifacts of the raw full-screen capture. Crop bounds found by sampling pixel colors at the window's edges rather than eyeballing coordinates.
+
 ### 2026-07-31 — v1.0.17: Player/Menu Screenshots
 
 - **New `📸 Screenshots` section** in the README: the player with the ModernZ OSC, the right-click menu, the Open submenu (native file/folder/URL dialogs), and the Tools submenu (Clip export, hardware decoding toggle). Screenshots taken directly against a live mpv instance rather than mocked up.

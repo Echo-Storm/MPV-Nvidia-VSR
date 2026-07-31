@@ -1,4 +1,4 @@
-# 🎬 MPV Echostorm Edition
+<p align="center"><img src="doc/header.svg" width="100%" alt="MPV Echostorm Edition — Portable Windows mpv build tuned for NVIDIA RTX Video Super Resolution"></p>
 
 ## 🧠 Overview
 
@@ -14,21 +14,28 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
 
 ## 📸 Screenshots
 
-**Player (ModernZ OSC)**
-
-![mpv player](doc/mpv_player_osc.jpg)
-
-**Right-click menu**
-
-![Right-click menu](doc/mpv_rightclick_menu.jpg)
-
-**Open submenu** — native file/folder/URL dialogs
-
-![Open submenu](doc/mpv_open_submenu.jpg)
-
-**Tools submenu** — clip export, hardware decoding toggle, and more
-
-![Tools submenu](doc/mpv_tools_clipexport_submenu.jpg)
+<table>
+<tr>
+<td width="50%">
+<img src="doc/mpv_player_osc.jpg" width="100%">
+<p align="center"><sub><b>Player</b> — ModernZ OSC</sub></p>
+</td>
+<td width="50%">
+<img src="doc/mpv_rightclick_menu.jpg" width="100%">
+<p align="center"><sub><b>Right-click menu</b></sub></p>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="doc/mpv_open_submenu.jpg" width="100%">
+<p align="center"><sub><b>Open submenu</b> — native file/folder/URL dialogs</sub></p>
+</td>
+<td width="50%">
+<img src="doc/mpv_tools_clipexport_submenu.jpg" width="100%">
+<p align="center"><sub><b>Tools submenu</b> — Clip export, hardware decoding toggle</sub></p>
+</td>
+</tr>
+</table>
 
 ---
 
@@ -179,6 +186,8 @@ MPV/
 
 Full version history moved to [CHANGELOG.md](CHANGELOG.md).
 
-### 2026-07-31 — v1.0.17: Player/Menu Screenshots
+### 2026-07-31 — v1.0.18: Header Banner, 2x2 Screenshot Grid, Cropped Screenshots
 
-- **New `📸 Screenshots` section** in the README: the player with the ModernZ OSC, the right-click menu, the Open submenu (native file/folder/URL dialogs), and the Tools submenu (Clip export, hardware decoding toggle). Screenshots taken directly against a live mpv instance rather than mocked up.
+- **New `doc/header.svg`** — a banner at the top of the README (play-icon mark, title, tagline, and RTX VSR/HDR/Portable/No Admin Required tags), colored to match ModernZ's actual accent orange (`#FF8232`, the same value as `seekbarfg_color` in `modernz.conf`) rather than an arbitrary palette.
+- **Screenshots section reworked into a 2x2 grid** (HTML table, since GitHub-flavored markdown has no native side-by-side image layout) with captions, instead of four images stacked vertically.
+- **All four screenshots re-cropped** to the mpv window itself — removed the desktop icons visible down the left edge and the taskbar along the bottom, both artifacts of the raw full-screen capture. Crop bounds found by sampling pixel colors at the window's edges rather than eyeballing coordinates.
