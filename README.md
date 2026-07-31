@@ -25,6 +25,14 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
    - Registers MPV for "Open With" with common media formats
    - Requires admin, will auto-detect and prompt
 
+### 🛠️ To change settings without hand-editing config files:
+
+- **Run `3_Configuration_Manager.ps1`**
+  - A small checkbox/dropdown/text panel for the settings you're most likely to actually flip — audio/subtitle language priority, interpolation, debanding, auto-crop, RTX Video HDR, HDR display mode, surround audio preference, the two opt-in audio fixes, chapter auto-skip, stream thumbnails, max stream quality, and the stream auto-reload triggers
+  - Reads and rewrites only the specific lines it changes — every comment and every other setting in `mpv.conf`/`script-opts/*.conf` is left exactly where it was
+  - No admin required. Changes take effect the next time mpv starts (this edits the files mpv reads at launch, it doesn't talk to a running mpv instance)
+  - Renders in light mode regardless of system theme — it's a plain WPF window, which (unlike the native file-open dialog) doesn't auto-theme on Windows 11
+
 ### 🔄 To uninstall:
 
 - **Run `X1_Remove_Supported_File_types_From_Open_With.ps1`**
@@ -44,6 +52,7 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
 MPV/
 ├── 1_Full_Latest_MPV_Installer.ps1
 ├── 2_Add_Supported_Filetypes_To_Open_With.ps1          ← registration (PATH + Open With)
+├── 3_Configuration_Manager.ps1                         ← checkbox/dropdown panel for common config toggles
 ├── X1_Remove_Supported_File_types_From_Open_With.ps1   ← uninstall (reverses script 2)
 ├── doc/
 │   ├── manual.pdf
@@ -95,6 +104,7 @@ MPV/
 
 ## 🎯 Features
 
+- **Configuration Manager:** `3_Configuration_Manager.ps1` — a standalone checkbox/dropdown/text panel (including audio/subtitle language priority) for the settings worth flipping without opening a config file by hand, editing only the specific lines it changes. See Installation & Usage above
 - **Base UI:** ModernZ v0.3.3 with fluent icon theme
 - **Fonts:** Netflix Sans Medium (default), with Light and Bold variants
 - **Upscaling:** RTX VSR activates ~4 seconds after playback starts (3s hwdec settle + 1s crop detection), auto-upscales to native resolution — only applies when the *cropped* video content is below display resolution and hardware decoded (`vsr_autocrop.lua`)
@@ -138,6 +148,8 @@ MPV/
 - **HDR isn't switching/passing through.** `hdr-mode.lua` needs the companion [mpv-display-plugin](https://github.com/dyphire/mpv-display-plugin) (`scripts/display-info.dll`) for display capability info — without it, `hdr_mode` has nothing to act on.
 - **Enabled `nvidia_true_hdr` but nothing changes.** Needs mpv 0.40+, RTX Video HDR enabled in the NVIDIA app, an SDR (8-bit) source, and the display already in HDR mode — `vsr_autocrop.lua` checks that last part itself via `mpv-display-plugin` before applying anything, since mpv's own filter has no such check and can visibly misbehave on an SDR display ([mpv#17800](https://github.com/mpv-player/mpv/issues/17800)). If the plugin isn't installed, this option is silently a permanent no-op.
 - **The Open Folder / Open URL dialogs look light-mode even in a dark theme.** Expected — both use legacy pre-Vista Windows APIs (`Shell.Application.BrowseForFolder`, VB.NET's `InputBox`) that predate dark mode and were never retrofitted for it. Open File/Add Subtitle/Add Audio use the modern dialog, which does follow system theme automatically.
+- **Configuration Manager is light-mode even in a dark theme.** Same underlying reason as above, different cause: it's a plain WPF window, and WPF (unlike the modern `IFileDialog`-based open/subtitle/audio pickers) doesn't auto-theme on Windows 11 without custom styling work. Cosmetic only.
+- **Changed a setting in Configuration Manager but nothing's different.** Expected if mpv was already running — it edits the config files mpv reads at launch, not a running instance. Restart mpv (or launch it fresh) to pick up the change.
 
 ---
 
@@ -145,12 +157,6 @@ MPV/
 
 Full version history moved to [CHANGELOG.md](CHANGELOG.md).
 
-### 2026-07-30 — v1.0.14: NVIDIA RTX Video HDR, Hardening Pass, CHANGELOG Split
+### 2026-07-30 — v1.0.15: Configuration Manager
 
-- **New — NVIDIA RTX Video HDR support in `vsr_autocrop.lua`**: optional SDR→HDR enhancement via d3d11vpp's `nvidia-true-hdr` suboption (mpv 0.40+), off by default (`nvidia_true_hdr=no` in `vsr_autocrop.conf`), toggle added to the right-click `&Window` menu. Only ever applies when the display is confirmed already in HDR mode (via the same `mpv-display-plugin` info `hdr-mode.lua` already reads) and the source is SDR (8-bit) — mpv's own filter has no such check built in and visibly misbehaves on an SDR display ([mpv#17800](https://github.com/mpv-player/mpv/issues/17800)), so this script gates it itself. Can apply with or without VSR upscaling itself (`scale=1` is valid when content is already at display resolution), unlike VSR which only ever engages when upscaling is warranted.
-- **Hardening pass** on `chapterskip.lua` and `screenshotfolder_echostorm.lua` (the same fresh-eyes review that caught real bugs in `vsr_autocrop.lua` earlier, now applied to the rest of the custom scripts): `chapterskip.lua` could throw a nil-arithmetic error inside its `chapter`-property callback if the property briefly reported `nil` (e.g. mid-seek); `screenshotfolder_echostorm.lua`'s verbose "Saved to: ..." message (only shown when `short_saved_message=no`) was double-prefixing `~~`, producing a broken path. `prefer_surround_echostorm.lua` was already solid from its earlier language-aware fix — no changes needed there.
-- **Bug fix — `[WEB-DL]` auto-profile's `profile-cond` could throw a Lua error.** Found in `mpv.log`: `string.match(p.filename, ...)` was called with no nil-check, and `p.filename` is nil whenever the condition gets evaluated with nothing loaded (e.g. idle at startup) — `bad argument #1 to 'match' (string expected, got nil)`, three times in one session's log. Guarded with `p.filename ~= nil and (...)` so the match calls only run once a file is actually loaded.
-- **New — optional motion interpolation**: `interpolation=no` + `tscale=oversample` added explicitly to `mpv.conf` (off by default), toggle added to the right-click `&Video` menu (`cycle interpolation`) next to Deband/Deinterlace.
-- **New — `clip_export_echostorm.lua`**: mark an in/out point during playback and export that range via bundled `ffmpeg.exe` as a lossless stream-copy clip (`-c copy`, no re-encoding), saved to `Desktop/mpv/clips/`. `-ss` before `-i` (fast input seek) + `-to` after `-i` (output option, absolute position in the original timeline — ffmpeg's own documented pattern, confirmed against the ffmpeg wiki's Seeking page since `-to`'s behavior here is a well-known gotcha). Directory auto-created via a quick blocking `mkdir` subprocess before the async ffmpeg export starts, since ffmpeg won't create missing output directories itself. Reachable from the right-click `Tools` → `Clip export` submenu (mark start, mark end, export, clear marks) — no default keybindings, menu-only, matching most of this repo's secondary functions.
-- **New — `stream_quality_echostorm.lua`**: bump `ytdl-format`'s quality cap up/down mid-stream (right-click Playback menu), for the same domains `ytdlautoformat.lua` already handles. `ytdl-format` is only read by yt-dlp at file-load time, so there's no way to change it live on an already-open stream — this sets `file-local-options/ytdl-format` to the new cap and reloads at the current position (`file-local-options/start` + `playlist-play-index`), the same mechanism the existing "Reload stream (on stall)" entry already uses. Relies on `ytdlautoformat.lua`'s own `respect_manual_changes`/`external_override` tracking (already in that script, previously unused by anything) to recognize this as a manual override and not immediately stomp it back to its own static cap on the reload. Defaults to the top of its quality ladder as the starting point when the current cap isn't recognized (e.g. no cap set, or a site `ytdlautoformat` doesn't cover), and skips the reload entirely if a bump wouldn't actually change anything (already at that rung).
-- **Changelog split out of README** into a standalone [CHANGELOG.md](CHANGELOG.md) — the README's version history had grown large enough to bury the actual project description above it.
+- **New — `3_Configuration_Manager.ps1`**: a standalone PowerShell+WPF checkbox/dropdown/text panel for the settings worth flipping without opening a config file by hand — audio/subtitle language priority, interpolation, debanding, auto-crop, RTX Video HDR, HDR display mode, surround audio preference, the two opt-in audio fixes (audio-stream-silence, dynaudnorm), chapter auto-skip, stream thumbnails, max stream quality cap, and the three stream auto-reload triggers. Edits only the specific line each changed setting owns — every comment and every other setting in `mpv.conf`/`script-opts/*.conf` is preserved untouched, verified by diffing a full round-trip against the real files (flip every setting, write, diff against originals: exactly one changed line per touched setting, zero collateral changes). Guards against a same-named key inside an mpv.conf profile block (e.g. `[WEB-DL]`'s own `deband=yes`) ever being mistaken for the global setting, by stopping the line search at the first `[section]` header. No admin required; changes take effect the next time mpv starts, since it edits the files mpv reads at launch rather than talking to a running instance. Renders in light mode regardless of system theme (plain WPF window, doesn't auto-theme on Windows 11 the way the native file-open dialog does).
