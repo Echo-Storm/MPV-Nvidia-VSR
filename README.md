@@ -60,6 +60,7 @@ This setup is built for users who have Nvidia RTX Video Super Resolution (VSR) e
   - No admin required. Changes take effect the next time mpv starts (this edits the files mpv reads at launch, it doesn't talk to a running mpv instance)
   - Renders in light mode regardless of system theme — it's a plain WPF window, which (unlike the native file-open dialog) doesn't auto-theme on Windows 11
 
+  - Slightly out of date example:
   ![Configuration Manager](doc/configuration_manager.png)
 
 ### 🔄 To uninstall:
